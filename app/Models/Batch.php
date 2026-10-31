@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use Database\Factories\BatchFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Batch extends Model
 {
+    /** @use HasFactory<BatchFactory> */
+    use HasFactory;
+
     protected $fillable = ['product_id', 'batch_number', 'expiry_date'];
 
     /** @return array<string, string> */

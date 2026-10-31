@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property numeric-string $quantity
+ */
 class StockLevel extends Model
 {
     protected $fillable = ['product_id', 'location_id', 'batch_id', 'quantity'];
