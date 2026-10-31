@@ -1,0 +1,110 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Product extends Model
+{
+    use SoftDeletes;
+
+    protected $fillable = [
+        'sku',
+        'name',
+        'category_id',
+        'base_unit_id',
+        'reorder_level',
+        'track_batches',
+        'description',
+        'is_active',
+    ];
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'reorder_level' => 'decimal:3',
+            'track_batches' => 'boolean',
+            'is_active' => 'boolean',
+        ];
+    }
+
+    /** @return BelongsTo<Category, $this> */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    /** @return BelongsTo<Unit, $this> */
+    public function baseUnit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class, 'base_unit_id');
+    }
+
+    /** @return HasMany<ProductUnit, $this> */
+    public function productUnits(): HasMany
+    {
+        return $this->hasMany(ProductUnit::class);
+    }
+
+    /** @return BelongsToMany<Unit, $this> */
+    public function units(): BelongsToMany
+    {
+        return $this->belongsToMany(Unit::class, 'product_units')->withPivot('factor')->withTimestamps();
+    }
+
+    /** @return HasMany<Batch, $this> */
+    public function batches(): HasMany
+    {
+        return $this->hasMany(Batch::class);
+    }
+
+    /** @return HasMany<StockLevel, $this> */
+    public function stockLevels(): HasMany
+    {
+        return $this->hasMany(StockLevel::class);
+    }
+
+    /** @return HasMany<StockMovement, $this> */
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeWithTotalQuantity(Builder $query): Builder
+    {
+        return $query->withSum('stockLevels as total_qty', 'quantity');
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeLowStock(Builder $query): Builder
+    {
+        return $query->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM stock_levels WHERE stock_levels.product_id = products.id) <= products.reorder_level');
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeSearch(Builder $query, string $term): Builder
+    {
+        $pattern = '%'.$term.'%';
+
+        return $query->where(function (Builder $query) use ($pattern): void {
+            $query->where('name', 'ILIKE', $pattern)
+                ->orWhere('sku', 'ILIKE', $pattern);
+        });
+    }
+}
