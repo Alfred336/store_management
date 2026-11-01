@@ -286,3 +286,67 @@ test('decimal quantities such as 0.125 stay exact end to end', function () {
 
     expectStockMovementsToMatchLevels($this->product, $this->location);
 });
+
+test('mixed stock operations reconcile movements to levels per product location and batch', function () {
+    $product = Product::factory()->create([
+        'base_unit_id' => $this->baseUnit->id,
+        'track_batches' => true,
+    ]);
+    $batchA = Batch::factory()->create(['product_id' => $product->id, 'batch_number' => 'MIX-A']);
+    $batchB = Batch::factory()->create(['product_id' => $product->id, 'batch_number' => 'MIX-B']);
+    $destination = Location::factory()->create(['name' => 'Transfer Destination']);
+
+    $this->service->receive([
+        'product_id' => $product->id,
+        'location_id' => $this->location->id,
+        'batch_id' => $batchA->id,
+        'quantity' => '10.250',
+    ]);
+    $this->service->receive([
+        'product_id' => $product->id,
+        'location_id' => $this->location->id,
+        'batch_id' => $batchB->id,
+        'quantity' => '3.500',
+    ]);
+    $this->service->issue([
+        'product_id' => $product->id,
+        'location_id' => $this->location->id,
+        'batch_id' => $batchA->id,
+        'quantity' => '2.125',
+        'type' => 'sale',
+    ]);
+    $this->service->adjust([
+        'product_id' => $product->id,
+        'location_id' => $this->location->id,
+        'batch_id' => $batchA->id,
+        'quantity' => '0.375',
+        'reason' => 'Count correction',
+    ]);
+    $this->service->transfer([
+        'product_id' => $product->id,
+        'from_location_id' => $this->location->id,
+        'to_location_id' => $destination->id,
+        'batch_id' => $batchA->id,
+        'quantity' => '4.000',
+    ]);
+
+    $levelsByLocationAndBatch = $product->stockLevels->mapWithKeys(
+        fn (StockLevel $level): array => [$level->location_id.':'.($level->batch_id ?? 'null') => $level->quantity],
+    );
+
+    $movementsByLocationAndBatch = StockMovement::query()
+        ->where('product_id', $product->id)
+        ->get()
+        ->groupBy(fn (StockMovement $movement): string => $movement->location_id.':'.($movement->batch_id ?? 'null'))
+        ->map(fn ($movements): string => $movements->reduce(
+            fn (string $sum, StockMovement $movement): string => bcadd($sum, $movement->quantity, 3),
+            '0.000',
+        ));
+
+    expect($levelsByLocationAndBatch->keys()->sort()->values()->all())
+        ->toBe($movementsByLocationAndBatch->keys()->sort()->values()->all());
+
+    foreach ($levelsByLocationAndBatch as $key => $quantity) {
+        expect(bccomp((string) $quantity, $movementsByLocationAndBatch->get($key), 3))->toBe(0);
+    }
+});

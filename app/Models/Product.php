@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/** @property numeric-string $reorder_level */
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */

@@ -16,6 +16,21 @@
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
+
+                <flux:sidebar.group heading="Inventory" class="grid">
+                    @can('viewAny', App\Models\Product::class)
+                        <flux:sidebar.item icon="cube" :href="route('products.index')" :current="request()->routeIs('products.*')" wire:navigate>Products</flux:sidebar.item>
+                    @endcan
+                    @can('viewAny', App\Models\Category::class)
+                        <flux:sidebar.item icon="tag" :href="route('categories.index')" :current="request()->routeIs('categories.*')" wire:navigate>Categories</flux:sidebar.item>
+                    @endcan
+                    @can('viewAny', App\Models\Unit::class)
+                        <flux:sidebar.item icon="scale" :href="route('units.index')" :current="request()->routeIs('units.*')" wire:navigate>Units</flux:sidebar.item>
+                    @endcan
+                    @can('viewAny', App\Models\Location::class)
+                        <flux:sidebar.item icon="map-pin" :href="route('locations.index')" :current="request()->routeIs('locations.*')" wire:navigate>Locations</flux:sidebar.item>
+                    @endcan
+                </flux:sidebar.group>
             </flux:sidebar.nav>
 
             <flux:spacer />
