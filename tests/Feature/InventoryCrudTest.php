@@ -41,11 +41,13 @@ test('role seeder syncs the intended permissions idempotently', function () {
     $storekeeper = Role::findByName('Storekeeper', 'web');
     $viewer = Role::findByName('Viewer', 'web');
 
-    expect($admin->permissions)->toHaveCount(16)
-        ->and($storekeeper->permissions)->toHaveCount(12)
-        ->and($viewer->permissions)->toHaveCount(4)
+    expect($admin->permissions)->toHaveCount(33)
+        ->and($storekeeper->permissions)->toHaveCount(13)
+        ->and($viewer->permissions)->toHaveCount(5)
         ->and($storekeeper->hasPermissionTo('products.delete'))->toBeFalse()
-        ->and($viewer->hasPermissionTo('products.update'))->toBeFalse();
+        ->and($viewer->hasPermissionTo('products.update'))->toBeFalse()
+        ->and(Role::findByName('Cashier', 'web')->hasPermissionTo('pos.access'))->toBeTrue()
+        ->and(Role::findByName('Cashier', 'web')->hasPermissionTo('invoices.void'))->toBeFalse();
 });
 
 test('unit component renders searchable data and creates updates and protects referenced units', function () {
@@ -189,6 +191,7 @@ test('product component normalizes unique skus saves packaging and protects stoc
     Livewire::actingAs($user)->test(ProductsIndex::class)
         ->call('openForm')
         ->set('sku', '  kit-001  ')
+        ->set('barcode', '1234567890123')
         ->set('name', 'Starter Kit')
         ->set('categoryId', (string) $category->id)
         ->set('baseUnitId', (string) $baseUnit->id)
@@ -202,7 +205,9 @@ test('product component normalizes unique skus saves packaging and protects stoc
 
     $product = Product::query()->where('sku', 'KIT-001')->firstOrFail();
     expect($product->productUnits)->toHaveCount(1)
-        ->and($product->productUnits->first()->factor)->toBe('24.000');
+        ->and($product->productUnits->first()->factor)->toBe('24.000')
+        ->and($product->barcode)->toBe('1234567890123')
+        ->and($product->tax_type)->toBe('standard');
 
     Livewire::actingAs($user)->test(ProductsIndex::class)
         ->call('openForm', $product->id)

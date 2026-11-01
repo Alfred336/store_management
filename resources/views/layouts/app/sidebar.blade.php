@@ -31,6 +31,11 @@
                         <flux:sidebar.item icon="map-pin" :href="route('locations.index')" :current="request()->routeIs('locations.*')" wire:navigate>Locations</flux:sidebar.item>
                     @endcan
                 </flux:sidebar.group>
+                @can('viewAny', App\Models\Setting::class)
+                    <flux:sidebar.group heading="Administration" class="grid">
+                        <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>Business settings</flux:sidebar.item>
+                    </flux:sidebar.group>
+                @endcan
             </flux:sidebar.nav>
 
             <flux:spacer />

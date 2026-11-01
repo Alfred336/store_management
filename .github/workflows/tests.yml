@@ -12,6 +12,27 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_DB: store_management_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: store_management_test
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
 
     steps:
       - name: Checkout code
@@ -24,6 +45,7 @@ jobs:
         with:
           php-version: '8.3'
           tools: composer:v2
+          extensions: bcmath, gd, intl, mbstring, pdo_pgsql, zip
           coverage: none
 
       - name: Setup Node

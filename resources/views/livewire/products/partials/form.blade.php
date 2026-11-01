@@ -4,7 +4,9 @@
         @if ($productId && $hasMovements)<div class="rounded-xl border border-amber-300/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">Base unit and batch tracking are locked because this product has stock movement history.</div>@endif
         <div class="grid gap-4 sm:grid-cols-2">
             <flux:input wire:model="sku" label="SKU" required />
+            <flux:input wire:model="barcode" label="Barcode" />
             <flux:input wire:model="name" label="Product name" required />
+            <flux:select wire:model="taxType" label="Tax type" required><option value="standard">Standard VAT</option><option value="exempt">Exempt</option><option value="zero_rated">Zero-rated</option></flux:select>
             <flux:select wire:model="categoryId" label="Category"><option value="">No category</option>@foreach ($categories as $category)<option value="{{ $category->id }}">{{ $category->name }}</option>@endforeach</flux:select>
             @if ($productId && $hasMovements)
                 <flux:select label="Base unit" disabled><option>{{ $editingProduct->baseUnit->name }}</option></flux:select>

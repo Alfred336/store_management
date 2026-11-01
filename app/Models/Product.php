@@ -21,6 +21,8 @@ class Product extends Model
 
     protected $fillable = [
         'sku',
+        'barcode',
+        'tax_type',
         'name',
         'category_id',
         'base_unit_id',
@@ -35,6 +37,7 @@ class Product extends Model
     {
         return [
             'reorder_level' => 'decimal:3',
+            'barcode' => 'string',
             'track_batches' => 'boolean',
             'is_active' => 'boolean',
         ];

@@ -5,10 +5,12 @@ namespace App\Providers;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
+use App\Models\Setting;
 use App\Models\Unit;
 use App\Policies\CategoryPolicy;
 use App\Policies\LocationPolicy;
 use App\Policies\ProductPolicy;
+use App\Policies\SettingPolicy;
 use App\Policies\UnitPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -38,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Category::class, CategoryPolicy::class);
         Gate::policy(Location::class, LocationPolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
+        Gate::policy(Setting::class, SettingPolicy::class);
     }
 
     /**

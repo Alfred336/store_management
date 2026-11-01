@@ -45,6 +45,10 @@ class Index extends Component
 
     public string $sku = '';
 
+    public string $barcode = '';
+
+    public string $taxType = 'standard';
+
     public string $name = '';
 
     public ?string $categoryId = null;
@@ -110,6 +114,8 @@ class Index extends Component
 
             $this->productId = $product->id;
             $this->sku = $product->sku;
+            $this->barcode = $product->barcode ?? '';
+            $this->taxType = $product->tax_type;
             $this->name = $product->name;
             $this->categoryId = $product->category_id === null ? null : (string) $product->category_id;
             $this->baseUnitId = (string) $product->base_unit_id;
@@ -235,6 +241,8 @@ class Index extends Component
     {
         $this->productId = null;
         $this->sku = '';
+        $this->barcode = '';
+        $this->taxType = 'standard';
         $this->name = '';
         $this->categoryId = null;
         $this->baseUnitId = null;
@@ -325,6 +333,8 @@ class Index extends Component
 
         $data = $this->validate([
             'sku' => ['required', 'string', 'max:255', Rule::unique('products', 'sku')->ignore($this->productId)],
+            'barcode' => ['nullable', 'string', 'max:64', Rule::unique('products', 'barcode')->ignore($this->productId)],
+            'taxType' => ['required', Rule::in(['standard', 'exempt', 'zero_rated'])],
             'name' => ['required', 'string', 'max:255'],
             'categoryId' => ['nullable', 'integer', 'exists:categories,id'],
             'baseUnitId' => ['required', 'integer', 'exists:units,id'],
@@ -339,6 +349,8 @@ class Index extends Component
 
         return [
             'sku' => $data['sku'],
+            'barcode' => $data['barcode'] ?: null,
+            'tax_type' => $data['taxType'],
             'name' => $data['name'],
             'category_id' => $data['categoryId'] ?: null,
             'base_unit_id' => $data['baseUnitId'],
