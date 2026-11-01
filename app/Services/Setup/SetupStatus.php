@@ -2,19 +2,43 @@
 
 namespace App\Services\Setup;
 
+use App\Models\Setting;
 use App\Models\User;
-use Illuminate\Support\Facades\Schema;
 
 /** Determine whether a database still needs its first administrator setup. */
 class SetupStatus
 {
+    private const CACHE_KEY = 'setup:completed';
+
     public function isRequired(): bool
     {
-        if (! Schema::hasTable('settings') || ! Schema::hasTable('users')) {
+        if (cache()->get(self::CACHE_KEY) === true) {
             return false;
         }
 
-        // Setup is disabled permanently as soon as any user exists.
-        return ! User::query()->exists();
+        if (Setting::query()->whereKey('setup_completed_at')->exists()) {
+            cache()->forever(self::CACHE_KEY, true);
+
+            return false;
+        }
+
+        $hasUsers = User::query()->exists();
+
+        if ($hasUsers) {
+            cache()->forever(self::CACHE_KEY, true);
+        }
+
+        return ! $hasUsers;
+    }
+
+    /** Invalidate the cached first-user check after a user is created or removed. */
+    public function forget(): void
+    {
+        cache()->forget(self::CACHE_KEY);
+    }
+
+    public function markComplete(): void
+    {
+        cache()->forever(self::CACHE_KEY, true);
     }
 }

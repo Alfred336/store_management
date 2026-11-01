@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Setup;
 
-use App\Actions\Setup\CompleteInitialSetup;
+use App\Livewire\Actions\Setup\CompleteInitialSetup;
 use App\Services\Setup\SetupStatus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;

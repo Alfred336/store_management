@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Categories;
 
-use App\Actions\Categories\CreateCategory;
-use App\Actions\Categories\DeleteCategory;
-use App\Actions\Categories\UpdateCategory;
+use App\Livewire\Actions\Categories\CreateCategory;
+use App\Livewire\Actions\Categories\DeleteCategory;
+use App\Livewire\Actions\Categories\UpdateCategory;
 use App\Models\Category;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;

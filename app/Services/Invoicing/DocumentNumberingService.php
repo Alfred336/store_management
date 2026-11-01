@@ -13,7 +13,7 @@ class DocumentNumberingService
 
     public function next(string $type, ?int $year = null): string
     {
-        if (! in_array($type, ['invoice', 'receipt', 'payment'], true)) {
+        if (! in_array($type, ['invoice', 'receipt', 'payment', 'customer'], true)) {
             throw new InvalidArgumentException('Unsupported document sequence type.');
         }
 
@@ -25,6 +25,7 @@ class DocumentNumberingService
                 'invoice' => 'INV',
                 'receipt' => 'RCT',
                 'payment' => 'PAY',
+                'customer' => 'CUS',
             });
             $digits = (int) $this->settings->get('numbering.digits', 6);
             $digits = max(1, min($digits, 12));

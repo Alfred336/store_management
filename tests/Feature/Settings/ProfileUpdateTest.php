@@ -2,7 +2,10 @@
 
 use App\Livewire\Settings\Profile;
 use App\Models\User;
+use App\Services\Authorization\AdminAccountProtection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 test('profile page is displayed', function () {
     $this->actingAs($user = User::factory()->create());
@@ -73,4 +76,50 @@ test('correct password must be provided to delete account', function () {
     $response->assertHasErrors(['password']);
 
     expect($user->fresh())->not->toBeNull();
+});
+
+dataset('last administrator roles', ['Admin', 'Owner/Admin']);
+
+test('the only Admin cannot delete their account and receives a clear message', function (string $roleName) {
+    $role = Role::findOrCreate($roleName, 'web');
+    $admin = User::factory()->create();
+    $admin->assignRole($role);
+    $this->actingAs($admin);
+
+    Livewire::test('settings.delete-user-form')
+        ->set('password', 'password')
+        ->call('deleteUser')
+        ->assertHasErrors(['account' => 'You cannot delete or deactivate the last Admin account. Assign Admin to another user first.']);
+
+    expect($admin->fresh())->not->toBeNull()
+        ->and(app(AdminAccountProtection::class)->isLastAdmin($admin))->toBeTrue();
+
+    expect(Gate::forUser($admin)->allows('delete', $admin))->toBeFalse();
+})->with('last administrator roles');
+
+test('an Admin can delete their own account when another Admin remains', function () {
+    $adminRole = Role::findOrCreate('Admin', 'web');
+    $firstAdmin = User::factory()->create();
+    $secondAdmin = User::factory()->create();
+    $firstAdmin->assignRole($adminRole);
+    $secondAdmin->assignRole($adminRole);
+    expect(app(AdminAccountProtection::class)->adminCount())->toBe(2)
+        ->and(app(AdminAccountProtection::class)->isLastAdmin($firstAdmin))->toBeFalse();
+    $this->actingAs($firstAdmin);
+
+    Livewire::test('settings.delete-user-form')
+        ->set('password', 'password')
+        ->call('deleteUser')
+        ->assertHasNoErrors()
+        ->assertRedirect('/');
+
+    expect($firstAdmin->fresh())->toBeNull()
+        ->and($secondAdmin->fresh())->not->toBeNull();
+});
+
+test('user policy blocks deactivation of the final Admin', function () {
+    $user = User::factory()->create();
+    $user->assignRole(Role::findOrCreate('Admin', 'web'));
+
+    expect(Gate::forUser($user)->allows('deactivate', $user))->toBeFalse();
 });

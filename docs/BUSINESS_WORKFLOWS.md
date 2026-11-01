@@ -12,4 +12,8 @@ This explicitly uses **per-line rounding** rather than rounding only the final d
 
 ## Document numbering
 
-`DocumentNumberingService` allocates invoice (`INV`), receipt (`RCT`), and payment (`PAY`) identifiers from `document_sequences`. It obtains the next number while holding a row lock within the caller's transaction. Prefix, reset cadence, and digit width are read from the Settings service. A failed enclosing transaction rolls the sequence update back, preventing consumed numbers for failed issuance.
+`DocumentNumberingService` allocates customer (`CUS`), invoice (`INV`), receipt (`RCT`), and payment (`PAY`) identifiers from `document_sequences`. It obtains the next number while holding a row lock within the caller's transaction. Prefix, reset cadence, and digit width are read from the Settings service. Customer creation calls it inside its own transaction and `customers.code` has a unique constraint. A failed enclosing transaction rolls the sequence update back, preventing consumed numbers for failed creation/issuance.
+
+## Customer statements
+
+Customer balances are calculated at read time from issued/partially-paid/paid invoice totals minus `amount_paid`; the customer row does not store a balance. The in-app details panel lists up to ten most recent invoices and payments, while the downloadable PDF includes all available invoice and payment history. Until those schemas exist, both views return empty histories and a `0.00` balance.

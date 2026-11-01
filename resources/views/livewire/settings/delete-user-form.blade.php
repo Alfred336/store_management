@@ -21,6 +21,9 @@
             </div>
 
             <flux:input wire:model="password" :label="__('Password')" type="password" viewable />
+            @error('account')
+                <flux:callout variant="danger" icon="x-circle">{{ $message }}</flux:callout>
+            @enderror
 
             <div class="flex justify-end space-x-2 rtl:space-x-reverse">
                 <flux:modal.close>

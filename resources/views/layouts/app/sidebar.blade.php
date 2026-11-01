@@ -36,6 +36,11 @@
                         <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>Business settings</flux:sidebar.item>
                     </flux:sidebar.group>
                 @endcan
+                @can('viewAny', App\Models\Customer::class)
+                    <flux:sidebar.group heading="Sales" class="grid">
+                        <flux:sidebar.item icon="users" :href="route('customers.index')" :current="request()->routeIs('customers.*')" wire:navigate>Customers</flux:sidebar.item>
+                    </flux:sidebar.group>
+                @endcan
             </flux:sidebar.nav>
 
             <flux:spacer />

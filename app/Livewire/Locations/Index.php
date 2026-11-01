@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Locations;
 
-use App\Actions\Locations\CreateLocation;
-use App\Actions\Locations\DeleteLocation;
-use App\Actions\Locations\UpdateLocation;
+use App\Livewire\Actions\Locations\CreateLocation;
+use App\Livewire\Actions\Locations\DeleteLocation;
+use App\Livewire\Actions\Locations\UpdateLocation;
 use App\Models\Location;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;

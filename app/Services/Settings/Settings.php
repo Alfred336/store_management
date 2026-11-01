@@ -52,4 +52,12 @@ class Settings
     {
         $this->putMany([$key => $value]);
     }
+
+    /** Remove a setting and invalidate its cached value after the transaction commits. */
+    public function forget(string $key): void
+    {
+        DB::transaction(fn () => Setting::query()->whereKey($key)->delete());
+
+        DB::afterCommit(fn () => Cache::forget(self::CACHE_PREFIX.$key));
+    }
 }

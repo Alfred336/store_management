@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Setup\SetupStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
@@ -35,6 +37,20 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    protected static function booted(): void
+    {
+        static::created(function (): void {
+            app(SetupStatus::class)->forget();
+            DB::afterCommit(fn () => app(SetupStatus::class)->forget());
+        });
+
+        static::deleted(function (): void {
+            app(SetupStatus::class)->forget();
+            DB::afterCommit(fn () => app(SetupStatus::class)->forget());
+        });
+
+    }
 
     /**
      * Get the attributes that should be cast.

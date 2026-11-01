@@ -1,8 +1,8 @@
 # Routing
 
-Each application module route file is explicitly loaded by `bootstrap/app.php` inside Laravel's `web` middleware group. Authenticated application pages apply `auth` and `verified` middleware.
+All project routes live in clearly commented sections in `routes/web.php`. `bootstrap/app.php` uses the default Laravel web, console and health route registration, with the setup middleware appended to the web middleware group. Authenticated application pages apply `auth` and `verified` middleware.
 
-First-run setup is defined in `routes/setup.php`; the web middleware redirects a fresh install to that route until any administrator/user exists. The setup page then becomes unavailable. Business profile values are written into the Settings module's `settings` table.
+First-run setup is registered in the Initial setup section of `routes/web.php`, outside the authenticated route group. The web middleware redirects only when `setup_completed_at` is absent and no user exists. The setup page is blocked when that persistent setting exists, including after user deletion. Setup writes company details and completion state into the Settings table.
 
 | Method | URI | Name | Livewire component |
 |---|---|---|---|
@@ -13,7 +13,10 @@ First-run setup is defined in `routes/setup.php`; the web middleware redirects a
 | GET | `/categories` | `categories.index` | `App\Livewire\Categories\Index` |
 | GET | `/locations` | `locations.index` | `App\Livewire\Locations\Index` |
 | GET | `/products` | `products.index` | `App\Livewire\Products\Index` |
+| GET | `/customers` | `customers.index` | `App\Livewire\Customers\Index` |
+| GET | `/customers/export/{format}` | `customers.export` | Authorized XLSX/CSV download (`format`: `xlsx` or `csv`) |
+| GET | `/customers/{customer}/statement` | `customers.statement` | Authorized customer statement PDF |
 
-Inventory CRUD routes are separated into `routes/units.php`, `routes/categories.php`, `routes/locations.php`, and `routes/products.php`. Create, details, update, and delete interactions are modal/actions on each resource's Index component; there are no separate create/edit/show routes or resource controllers. Settings are managed at `/business-settings`; setup is a one-time bootstrap flow. Every inventory and settings component operation and Action enforces its registered policy.
+Routes are grouped and commented in `routes/web.php`: setup outside auth, followed by dashboard, inventory, customers, and business settings inside the authenticated group. Create, details, update, and delete interactions are modal/actions on each resource's Index component; there are no separate create/edit/show routes or resource controllers. Every component operation and Action enforces its registered policy.
 
 Inspect current registrations with `php artisan route:list --path=units`, and repeat for `categories`, `locations`, or `products`.

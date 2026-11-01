@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Actions\Authorization\EnsureSystemRoles;
+use App\Livewire\Actions\Authorization\EnsureSystemRoles;
 use Illuminate\Database\Seeder;
 
 /** Ensure the baseline roles and inventory permissions exist. */

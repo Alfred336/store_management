@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Services\Setup\SetupStatus;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 
@@ -29,5 +30,6 @@ class AdminUserSeeder extends Seeder
         );
 
         $admin->assignRole('Admin');
+        app(SetupStatus::class)->forget();
     }
 }

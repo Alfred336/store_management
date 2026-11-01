@@ -1,5 +1,8 @@
 <?php
 
+use App\Livewire\Actions\Customers\EnsureWalkInCustomer;
+use App\Models\Customer;
+use App\Services\Setup\SetupStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,6 +20,10 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+beforeEach(function (): void {
+    app(SetupStatus::class)->forget();
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -44,7 +51,7 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function ensureWalkInCustomerForTests(): Customer
 {
-    // ..
+    return app(EnsureWalkInCustomer::class)();
 }

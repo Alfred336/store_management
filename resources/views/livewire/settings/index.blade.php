@@ -31,6 +31,14 @@
             <flux:checkbox wire:model="resetYearly" label="Reset sequence each year" />
         </section>
 
+        <section class="grid gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900 md:grid-cols-2">
+            <flux:heading class="md:col-span-2">Customer credit control</flux:heading>
+            <flux:select wire:model="creditLimitMode" label="When a credit sale exceeds the limit">
+                <option value="warn">Warn and allow</option>
+                <option value="block">Block the sale</option>
+            </flux:select>
+        </section>
+
         <div class="flex justify-end"><flux:button variant="primary" type="submit">Save settings</flux:button></div>
     </form>
 </div>

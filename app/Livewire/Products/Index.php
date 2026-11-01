@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Products;
 
-use App\Actions\Products\CreateProduct;
-use App\Actions\Products\DeleteProduct;
-use App\Actions\Products\UpdateProduct;
+use App\Livewire\Actions\Products\CreateProduct;
+use App\Livewire\Actions\Products\DeleteProduct;
+use App\Livewire\Actions\Products\UpdateProduct;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Unit;

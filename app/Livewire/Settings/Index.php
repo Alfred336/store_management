@@ -2,10 +2,11 @@
 
 namespace App\Livewire\Settings;
 
-use App\Actions\Settings\UpdateBusinessSettings;
+use App\Livewire\Actions\Settings\UpdateBusinessSettings;
 use App\Models\Setting;
 use App\Services\Settings\Settings as SettingsService;
 use Flux\Flux;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -42,6 +43,8 @@ class Index extends Component
 
     public string $numberDigits = '6';
 
+    public string $creditLimitMode = 'warn';
+
     public function mount(SettingsService $settings): void
     {
         $this->authorize('viewAny', Setting::class);
@@ -60,6 +63,7 @@ class Index extends Component
         $this->paymentPrefix = (string) $settings->get('numbering.payment_prefix', 'PAY');
         $this->resetYearly = (bool) $settings->get('numbering.reset_yearly', true);
         $this->numberDigits = (string) $settings->get('numbering.digits', '6');
+        $this->creditLimitMode = (string) $settings->get('customers.credit_limit_mode', 'warn');
     }
 
     public function save(UpdateBusinessSettings $updateBusinessSettings): void
@@ -81,6 +85,7 @@ class Index extends Component
             'paymentPrefix' => ['required', 'string', 'max:12', 'alpha:upper'],
             'resetYearly' => ['required', 'boolean'],
             'numberDigits' => ['required', 'integer', 'between:1,12'],
+            'creditLimitMode' => ['required', Rule::in(['warn', 'block'])],
         ]);
 
         $updateBusinessSettings([
@@ -98,6 +103,7 @@ class Index extends Component
             'payment_prefix' => $data['paymentPrefix'],
             'reset_yearly' => (bool) $data['resetYearly'],
             'number_digits' => (int) $data['numberDigits'],
+            'credit_limit_mode' => $data['creditLimitMode'],
         ]);
 
         Flux::toast(variant: 'success', text: 'Business settings saved.');

@@ -2,6 +2,14 @@
 
 The schema contains the Laravel/auth tables, Spatie Permission tables, inventory tables `units`, `categories`, `locations`, `products`, `product_units`, `batches`, `stock_levels`, and `stock_movements`, plus application `settings` and `document_sequences` tables. No `business_profiles` table is used; company details are stored as keys in `settings`.
 
+## Customers
+
+- `customers` stores generated unique code, name, individual/business type, contact fields, TIN, notes, decimal credit limit, payment terms in days, active status, and a protected walk-in marker.
+- A PostgreSQL partial unique index allows at most one row with `is_walk_in = true`. The Walk-in Customer is created by a seeder or first-run setup, never by a migration.
+- Invoice/payment relations are deferred until those modules create their tables. Customer balance is calculated from invoice totals and `amount_paid`; it is not stored on customers.
+- `numbering.customer_prefix` is inserted by the new customer migration only when missing, defaulting to `CUS` while retaining any existing setting.
+- `customers.credit_limit_mode` defaults to `warn`; it configures the reusable credit evaluation service and is not duplicated as a customer balance/transaction field.
+
 ## Settings and document numbering
 
 - `settings` is a key/value table. Values are JSON-encoded text so booleans and numeric settings retain scalar types; all company profile, VAT, currency and numbering preferences live here.
