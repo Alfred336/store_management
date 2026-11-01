@@ -18,7 +18,7 @@ The active inventory CRUD modules are products, categories, units, and locations
 
 ## Authorization
 
-The `RoleSeeder` idempotently creates inventory, dashboard, settings, customer, invoice, payment and POS permissions. `Owner/Admin`, backwards-compatible `Admin`, and `Manager` receive the current full permission set; `Storekeeper`, `Cashier`, `Accountant`, and `Viewer` receive role-scoped grants. Permissions for modules not yet implemented are provisioned as foundations only. Model policies are explicitly registered in `AppServiceProvider`. Navigation visibility is a convenience only; Livewire operations enforce policies server-side.
+The `RoleSeeder` idempotently creates inventory, dashboard, settings, customer, invoice, payment and POS permissions. `Owner/Admin` and backwards-compatible `Admin` receive the current full permission set; `Storekeeper`, `Cashier`, `Accountant`, and `Viewer` receive role-scoped grants. Permissions for modules not yet implemented are provisioned as foundations only. Model policies are explicitly registered in `AppServiceProvider`. Navigation visibility is a convenience only; Livewire operations enforce policies server-side.
 
 ## First-run and settings foundation
 

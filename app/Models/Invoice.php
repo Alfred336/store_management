@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\InvoiceStatus;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,9 +11,50 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Single sales document for back-office invoices and POS receipts
  * (see the "channel" column). Written only through invoicing Actions.
+ *
+ * @property int $id
+ * @property string|null $number
+ * @property string $channel
+ * @property InvoiceStatus $status
+ * @property int $customer_id
+ * @property int $location_id
+ * @property CarbonImmutable|null $issue_date
+ * @property CarbonImmutable|null $due_date
+ * @property string $currency
+ * @property bool $prices_include_tax
+ * @property numeric-string $subtotal
+ * @property numeric-string $discount_total
+ * @property numeric-string $tax_total
+ * @property numeric-string $total
+ * @property numeric-string $amount_paid
+ * @property string|null $notes
+ * @property string|null $terms
+ * @property string|null $template_key
+ * @property string|null $customer_name
+ * @property string|null $customer_phone
+ * @property string|null $customer_address
+ * @property string|null $customer_tin
+ * @property string|null $customer_vrn
+ * @property string|null $idempotency_key
+ * @property int|null $created_by
+ * @property int|null $issued_by
+ * @property CarbonImmutable|null $issued_at
+ * @property int|null $voided_by
+ * @property CarbonImmutable|null $voided_at
+ * @property string|null $void_reason
+ * @property CarbonImmutable|null $created_at
+ * @property CarbonImmutable|null $updated_at
+ * @property string|null $creditWarning Transient runtime-only warning set by IssueInvoice when the
+ *                                       credit limit is exceeded in 'warn' mode. Never persisted.
  */
 class Invoice extends Model
 {
+    /**
+     * Runtime-only credit-limit warning set by IssueInvoice when the customer's configured
+     * credit limit is exceeded in 'warn' mode.  Never stored in the database.
+     */
+    public ?string $creditWarning = null;
+
     protected $fillable = [
         'number', 'channel', 'status', 'customer_id', 'location_id',
         'issue_date', 'due_date', 'currency', 'prices_include_tax',
@@ -40,32 +82,41 @@ class Invoice extends Model
         ];
     }
 
+    /** @return BelongsTo<Customer, $this> */
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
     }
 
+    /** @return BelongsTo<Location, $this> */
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
     }
 
+    /** @return HasMany<InvoiceItem, $this> */
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function issuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');
     }
 
-    /** Amount still owed. Computed from stored values with bcmath, never stored. */
+    /**
+     * Amount still owed. Computed from stored values with bcmath, never stored.
+     *
+     * @return numeric-string
+     */
     public function balance(): string
     {
         return bcsub((string) $this->total, (string) $this->amount_paid, 2);

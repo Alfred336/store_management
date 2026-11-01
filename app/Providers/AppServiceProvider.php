@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\Setting;
@@ -11,6 +12,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Policies\CategoryPolicy;
 use App\Policies\CustomerPolicy;
+use App\Policies\InvoicePolicy;
 use App\Policies\LocationPolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\SettingPolicy;
@@ -43,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Unit::class, UnitPolicy::class);
         Gate::policy(Category::class, CategoryPolicy::class);
         Gate::policy(Customer::class, CustomerPolicy::class);
+        Gate::policy(Invoice::class, InvoicePolicy::class);
         Gate::policy(Location::class, LocationPolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
         Gate::policy(Setting::class, SettingPolicy::class);

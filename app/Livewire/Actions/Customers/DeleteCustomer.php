@@ -26,13 +26,18 @@ class DeleteCustomer
                 throw ValidationException::withMessages(['customer' => 'The Walk-in Customer record cannot be deleted.']);
             }
 
-            foreach (['invoices', 'payments'] as $table) {
-                if (Schema::hasTable($table) && Schema::hasColumn($table, 'customer_id')
-                    && DB::table($table)->where('customer_id', $locked->id)->exists()) {
-                    throw ValidationException::withMessages([
-                        'customer' => 'This customer has transaction history. Deactivate the customer instead.',
-                    ]);
-                }
+            if ($locked->invoices()->exists()) {
+                throw ValidationException::withMessages([
+                    'customer' => 'This customer has transaction history. Deactivate the customer instead.',
+                ]);
+            }
+
+            // removed in Phase 4 when payments exist
+            if (Schema::hasTable('payments') && Schema::hasColumn('payments', 'customer_id')
+                && DB::table('payments')->where('customer_id', $locked->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'customer' => 'This customer has transaction history. Deactivate the customer instead.',
+                ]);
             }
 
             $locked->delete();

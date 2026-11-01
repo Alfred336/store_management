@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** @property int $id
  * @property string $code
@@ -31,5 +32,11 @@ class Customer extends Model
             'is_active' => 'boolean',
             'is_walk_in' => 'boolean',
         ];
+    }
+
+    /** @return HasMany<Invoice, $this> */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 }

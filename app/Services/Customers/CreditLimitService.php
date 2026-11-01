@@ -2,7 +2,6 @@
 
 namespace App\Services\Customers;
 
-use App\Livewire\Actions\Customers\GetCustomerStatement;
 use App\Models\Customer;
 use App\Services\Money\Money;
 use App\Services\Settings\Settings;
@@ -12,7 +11,7 @@ use InvalidArgumentException;
 class CreditLimitService
 {
     public function __construct(
-        private readonly GetCustomerStatement $getCustomerStatement,
+        private readonly CustomerBalance $customerBalance,
         private readonly Money $money,
         private readonly Settings $settings,
     ) {}
@@ -24,7 +23,7 @@ class CreditLimitService
             throw new InvalidArgumentException('Additional credit amount cannot be negative.');
         }
 
-        $balance = $this->getCustomerStatement->__invoke($customer)['balance'];
+        $balance = $this->customerBalance->outstanding($customer);
         $projectedBalance = $this->money->add($balance, $additionalCredit);
         $creditLimit = $customer->credit_limit;
 

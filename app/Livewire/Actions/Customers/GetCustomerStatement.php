@@ -3,7 +3,8 @@
 namespace App\Livewire\Actions\Customers;
 
 use App\Models\Customer;
-use App\Services\Money\Money;
+use App\Models\Invoice;
+use App\Services\Customers\CustomerBalance;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -12,76 +13,58 @@ use Illuminate\Support\Facades\Schema;
 /** Build a customer statement without storing a denormalized balance. */
 class GetCustomerStatement
 {
+    public function __construct(
+        private readonly CustomerBalance $customerBalance,
+    ) {}
+
     /**
-     * @return array{balance: string, total_spent: string, last_purchase_date: string|null, invoices: Collection<int, array<array-key, mixed>>, payments: Collection<int, array<array-key, mixed>>}
+     * @return array{balance: string, total_spent: string, last_purchase_date: string|null, invoices: Collection<int, array<string, mixed>>, payments: Collection<int, array<array-key, mixed>>}
      */
     public function __invoke(Customer $customer, ?int $limit = 10): array
     {
         Gate::authorize('view', $customer);
 
-        $invoices = $this->recentInvoices($customer, $limit);
-        $balance = '0.00';
-        $totalSpent = '0.00';
-        $lastPurchaseDate = null;
-
-        if ($this->invoiceTableIsReady()) {
-            $query = DB::table('invoices')->where('customer_id', $customer->id);
-
-            if (Schema::hasColumn('invoices', 'status')) {
-                $query->whereIn('status', ['issued', 'partially_paid', 'paid']);
-            }
-
-            $dateColumn = Schema::hasColumn('invoices', 'issue_date') ? 'issue_date' : null;
-
-            foreach ($query->get(['total', 'amount_paid', ...($dateColumn === null ? [] : [$dateColumn])]) as $invoice) {
-                $totalSpent = app(Money::class)->add($totalSpent, (string) $invoice->total);
-                $outstanding = app(Money::class)->sub((string) $invoice->total, (string) $invoice->amount_paid);
-                $balance = app(Money::class)->add($balance, $outstanding);
-
-                if ($dateColumn !== null && $invoice->{$dateColumn} !== null
-                    && ($lastPurchaseDate === null || $invoice->{$dateColumn} > $lastPurchaseDate)) {
-                    $lastPurchaseDate = (string) $invoice->{$dateColumn};
-                }
-            }
-        }
+        $summary = $this->customerBalance->summary($customer);
 
         return [
-            'balance' => $balance,
-            'total_spent' => $totalSpent,
-            'last_purchase_date' => $lastPurchaseDate,
-            'invoices' => $invoices,
+            'balance' => $summary['balance'],
+            'total_spent' => $summary['total_spent'],
+            'last_purchase_date' => $summary['last_purchase_date'],
+            'invoices' => $this->recentInvoices($customer, $limit),
             'payments' => $this->recentPayments($customer, $limit),
         ];
     }
 
-    /** @return Collection<int, array<array-key, mixed>> */
+    /** @return Collection<int, array<string, mixed>> */
     private function recentInvoices(Customer $customer, ?int $limit): Collection
     {
-        if (! $this->invoiceTableIsReady()) {
-            return collect();
-        }
-
-        $columns = array_values(array_filter(
-            ['number', 'issue_date', 'due_date', 'status', 'total', 'amount_paid', 'created_at'],
-            fn (string $column): bool => Schema::hasColumn('invoices', $column),
-        ));
-        $sortColumn = Schema::hasColumn('invoices', 'issue_date') ? 'issue_date' : 'id';
-
-        $query = DB::table('invoices')
-            ->where('customer_id', $customer->id)
-            ->orderByDesc($sortColumn)
+        $query = $customer->invoices()
+            ->orderByDesc('issue_date')
             ->orderByDesc('id');
 
         if ($limit !== null) {
             $query->limit($limit);
         }
 
-        return $query->get($columns)->map(fn (object $invoice): array => (array) $invoice);
+        /** @var Collection<int, array<string, mixed>> $result */
+        $result = $query->get()->map(fn (Invoice $invoice): array => [
+            'id' => $invoice->id,
+            'number' => $invoice->number,
+            'issue_date' => $invoice->issue_date?->format('Y-m-d'),
+            'due_date' => $invoice->due_date?->format('Y-m-d'),
+            'status' => $invoice->status->value,
+            'total' => (string) $invoice->total,
+            'amount_paid' => (string) $invoice->amount_paid,
+            'created_at' => (string) $invoice->created_at,
+        ]);
+
+        return $result;
     }
 
     /** @return Collection<int, array<array-key, mixed>> */
     private function recentPayments(Customer $customer, ?int $limit): Collection
     {
+        // removed in Phase 4 when payments exist
         if (! Schema::hasTable('payments') || ! Schema::hasColumn('payments', 'customer_id')
             || ! Schema::hasColumn('payments', 'amount')) {
             return collect();
@@ -107,13 +90,5 @@ class GetCustomerStatement
         }
 
         return $query->get($columns)->map(fn (object $payment): array => (array) $payment);
-    }
-
-    private function invoiceTableIsReady(): bool
-    {
-        return Schema::hasTable('invoices')
-            && Schema::hasColumn('invoices', 'customer_id')
-            && Schema::hasColumn('invoices', 'total')
-            && Schema::hasColumn('invoices', 'amount_paid');
     }
 }

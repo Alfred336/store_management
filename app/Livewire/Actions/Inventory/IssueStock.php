@@ -84,7 +84,8 @@ class IssueStock
     /**
      * Decide which batches supply the quantity, earliest expiry first.
      *
-     * @return list<array{batch_id: int, base_quantity: string}>
+     * @param  numeric-string  $baseQuantity
+     * @return list<array{batch_id: int, base_quantity: numeric-string}>
      */
     private function planByExpiry(Product $product, int $locationId, string $baseQuantity): array
     {
