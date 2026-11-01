@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\InvoiceStatus;
 use App\Exports\CustomersExport;
 use App\Livewire\Actions\Customers\CreateCustomer;
 use App\Livewire\Actions\Customers\DeleteCustomer;
@@ -7,6 +8,8 @@ use App\Livewire\Actions\Customers\ImportCustomers;
 use App\Livewire\Actions\Customers\UpdateCustomer;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Models\Customer;
+use App\Models\Invoice;
+use App\Models\Location;
 use App\Models\User;
 use App\Services\Customers\CreditLimitService;
 use App\Services\Settings\Settings;
@@ -92,7 +95,7 @@ test('customer validation rejects invalid types and negative credit limits', fun
         ->assertHasErrors(['type', 'creditLimit']);
 });
 
-test('customer list and statement work when invoice and payment tables do not exist yet', function () {
+test('customer list and statement work for a customer with no invoices', function () {
     $user = customerPermissionsUser(['customers.view']);
     $customer = Customer::query()->create([
         'code' => 'TEST-0001',
@@ -100,8 +103,7 @@ test('customer list and statement work when invoice and payment tables do not ex
         'type' => 'individual',
     ]);
 
-    expect(DB::getSchemaBuilder()->hasTable('invoices'))->toBeFalse()
-        ->and(DB::getSchemaBuilder()->hasTable('payments'))->toBeFalse();
+    expect(Invoice::query()->where('customer_id', $customer->id)->exists())->toBeFalse();
 
     Livewire::actingAs($user)->test(CustomersIndex::class)
         ->call('show', $customer->id)
@@ -112,41 +114,37 @@ test('customer list and statement work when invoice and payment tables do not ex
         ->assertSee('No payments yet.');
 });
 
-test('customer statement reads outstanding invoice balances and recent payment history when those tables exist', function () {
-    Schema::create('invoices', function ($table): void {
-        $table->id();
-        $table->foreignId('customer_id')->constrained();
-        $table->string('number')->unique();
-        $table->date('issue_date');
-        $table->string('status');
-        $table->decimal('total', 14, 2);
-        $table->decimal('amount_paid', 14, 2)->default(0);
-        $table->timestamps();
-    });
-    Schema::create('payments', function ($table): void {
-        $table->id();
-        $table->foreignId('customer_id')->constrained();
-        $table->decimal('amount', 14, 2);
-        $table->string('reference')->nullable();
-        $table->string('method')->nullable();
-        $table->timestamp('paid_at')->nullable();
-        $table->timestamps();
-    });
+test('customer statement reads outstanding invoice balances and recent payment history', function () {
+    // TEMPORARY: the real payments table arrives in Phase 4.
+    if (! Schema::hasTable('payments')) {
+        Schema::create('payments', function ($table): void {
+            $table->id();
+            $table->foreignId('customer_id')->constrained();
+            $table->decimal('amount', 14, 2);
+            $table->string('reference')->nullable();
+            $table->string('method')->nullable();
+            $table->timestamp('paid_at')->nullable();
+            $table->timestamps();
+        });
+    }
 
     $customer = Customer::query()->create([
         'code' => 'TEST-STATEMENT-1',
         'name' => 'Statement With History',
         'type' => 'business',
     ]);
-    DB::table('invoices')->insert([
-        'customer_id' => $customer->id,
+    $location = Location::forceCreate(['name' => 'Statement Test Store', 'type' => 'store', 'is_active' => true]);
+
+    Invoice::query()->create([
         'number' => 'INV-2026-000001',
+        'channel' => 'invoice',
+        'status' => InvoiceStatus::PartiallyPaid,
+        'customer_id' => $customer->id,
+        'location_id' => $location->id,
         'issue_date' => '2026-11-01',
-        'status' => 'partially_paid',
+        'subtotal' => '125.50',
         'total' => '125.50',
         'amount_paid' => '25.50',
-        'created_at' => now(),
-        'updated_at' => now(),
     ]);
     DB::table('payments')->insert([
         'customer_id' => $customer->id,

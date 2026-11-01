@@ -82,6 +82,27 @@ class StockService
         });
     }
 
+    /**
+     * Put stock back after a voided sale (movement type sale_return).
+     *
+     * Unlike receive(), this is allowed for inactive or soft-deleted products and
+     * inactive locations: a void must always be able to return exactly what was sold.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function returnSale(array $data): StockMovement
+    {
+        return DB::transaction(function () use ($data): StockMovement {
+            $product = $this->lockProduct($data['product_id'] ?? null);
+            $location = $this->lockLocation($data['location_id'] ?? null);
+            $batchId = $this->validatedBatchId($product, $data['batch_id'] ?? null);
+            $quantity = $this->positiveQuantity($data['quantity'] ?? null);
+            $baseQuantity = $this->convertToBase($product, $this->unitId($data['unit_id'] ?? null), $quantity);
+
+            return $this->applyStockChange($product, $location->id, $batchId, $baseQuantity, 'sale_return', $data);
+        });
+    }
+
     /** @param array<string, mixed> $data
      * @return array{0: StockMovement, 1: StockMovement}
      */
@@ -238,6 +259,22 @@ class StockService
         }
 
         return $location;
+    }
+
+    /** Lock a product in any state (used only for returns). */
+    private function lockProduct(mixed $productId): Product
+    {
+        $id = $this->requiredId($productId, 'product_id');
+
+        return Product::query()->withTrashed()->whereKey($id)->lockForUpdate()->firstOrFail();
+    }
+
+    /** Lock a location in any state (used only for returns). */
+    private function lockLocation(mixed $locationId): Location
+    {
+        $id = $this->requiredId($locationId, 'location_id');
+
+        return Location::query()->whereKey($id)->lockForUpdate()->firstOrFail();
     }
 
     /** @param Collection<int|string, Location> $locations */
