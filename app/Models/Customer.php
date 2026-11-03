@@ -14,13 +14,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $email
  * @property string|null $address
  * @property string|null $tin
+ * @property string|null $vrn
  * @property string|null $notes
  * @property numeric-string $credit_limit
  * @property int $payment_terms_days
  * @property bool $is_active
  * @property bool $is_walk_in
  */
-#[Fillable(['code', 'name', 'type', 'phone', 'email', 'address', 'tin', 'notes', 'credit_limit', 'payment_terms_days', 'is_active', 'is_walk_in'])]
+#[Fillable(['code', 'name', 'type', 'phone', 'email', 'address', 'tin', 'vrn', 'notes', 'credit_limit', 'payment_terms_days', 'is_active', 'is_walk_in'])]
 class Customer extends Model
 {
     /** @return array<string, string> */

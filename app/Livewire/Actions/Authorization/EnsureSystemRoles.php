@@ -41,19 +41,16 @@ class EnsureSystemRoles
             'invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue', 'invoices.print',
             'payments.view', 'payments.create', 'pos.access',
         ];
-        $accountantPermissions = ['dashboard.view', 'settings.view', 'customers.view', 'invoices.view', 'invoices.print', 'payments.view', 'payments.create'];
 
         foreach ($allPermissions as $permission) {
             Permission::findOrCreate($permission, 'web');
         }
 
         $roles = [
-            'Owner/Admin' => $allPermissions,
             'Admin' => $allPermissions,
             'Storekeeper' => array_merge($managePermissions, ['dashboard.view', 'invoices.view', 'invoices.print']),
-            'Viewer' => array_merge($viewPermissions, ['dashboard.view', 'invoices.view']),
             'Cashier' => $cashierPermissions,
-            'Accountant' => $accountantPermissions,
+            'Viewer' => array_merge($viewPermissions, ['dashboard.view', 'invoices.view']),
         ];
 
         foreach ($roles as $name => $permissions) {

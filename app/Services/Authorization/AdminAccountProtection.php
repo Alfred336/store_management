@@ -5,10 +5,10 @@ namespace App\Services\Authorization;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
-/** Prevent removal of the final Admin or Owner/Admin account. */
+/** Prevent removal of the final Admin account. */
 class AdminAccountProtection
 {
-    private const ADMIN_ROLES = ['Admin', 'Owner/Admin'];
+    private const ADMIN_ROLES = ['Admin'];
 
     public function isAdmin(User $user): bool
     {

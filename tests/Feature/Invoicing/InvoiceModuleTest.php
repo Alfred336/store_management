@@ -22,11 +22,13 @@ use App\Models\StockLevel;
 use App\Models\StockMovement;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Customers\CreditLimitService;
 use App\Services\Settings\Settings;
 use App\Services\StockService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
@@ -82,6 +84,7 @@ function invoiceTestSetup(bool $trackBatches = false): array
         'email' => 'info@kilimo.example',
         'address' => 'Morogoro Road, Dar es Salaam',
         'tin' => 'TIN-999-001',
+        'vrn' => 'VRN-TEST-001',
         'credit_limit' => '0.00',
         'payment_terms_days' => 30,
         'is_active' => true,
@@ -361,6 +364,30 @@ test('deleting non-draft invoice is blocked', function () {
     expect(Invoice::query()->find($draft->id))->not->toBeNull();
 });
 
+test('delete and update draft actions throw ValidationException for non-draft when policy bypassed', function () {
+    $setup = invoiceTestSetup();
+    $user = invoicingUser(['invoices.create', 'invoices.update']);
+    $this->actingAs($user);
+
+    $draft = app(CreateInvoiceDraft::class)([
+        'customer_id' => $setup['customer']->id,
+        'location_id' => $setup['location']->id,
+        'items' => [['product_id' => $setup['product']->id, 'quantity' => '1', 'unit_price' => '100.00']],
+    ]);
+
+    $draft->update(['status' => InvoiceStatus::Issued, 'number' => 'INV-2026-000099']);
+
+    // Bypass the InvoicePolicy so the action's own guard is reached.
+    Gate::before(fn () => true);
+
+    expect(fn () => app(DeleteInvoiceDraft::class)($draft))->toThrow(ValidationException::class);
+    expect(fn () => app(UpdateInvoiceDraft::class)($draft, [
+        'customer_id' => $setup['customer']->id,
+        'location_id' => $setup['location']->id,
+        'items' => [['product_id' => $setup['product']->id, 'quantity' => '2', 'unit_price' => '100.00']],
+    ]))->toThrow(ValidationException::class);
+});
+
 // ==========================================
 // ISSUE INVOICE TESTS
 // ==========================================
@@ -382,15 +409,16 @@ test('issuing invoice deducts exact stock and records allocations that sum to ba
 
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-TEST-001');
 
-    expect($issued->status)->toBe(InvoiceStatus::Issued)
-        ->and($issued->number)->not->toBeNull()
-        ->and($issued->issued_by)->toBe($user->id)
-        ->and($issued->issued_at)->not->toBeNull()
-        ->and($issued->idempotency_key)->toBe('IDEMP-TEST-001')
-        ->and($issued->customer_name)->toBe($setup['customer']->name)
-        ->and($issued->customer_phone)->toBe($setup['customer']->phone)
-        ->and($issued->customer_address)->toBe($setup['customer']->address)
-        ->and($issued->customer_tin)->toBe($setup['customer']->tin);
+    expect($issued->invoice->status)->toBe(InvoiceStatus::Issued)
+        ->and($issued->invoice->number)->not->toBeNull()
+        ->and($issued->invoice->issued_by)->toBe($user->id)
+        ->and($issued->invoice->issued_at)->not->toBeNull()
+        ->and($issued->invoice->idempotency_key)->toBe('IDEMP-TEST-001')
+        ->and($issued->invoice->customer_name)->toBe($setup['customer']->name)
+        ->and($issued->invoice->customer_phone)->toBe($setup['customer']->phone)
+        ->and($issued->invoice->customer_address)->toBe($setup['customer']->address)
+        ->and($issued->invoice->customer_tin)->toBe($setup['customer']->tin)
+        ->and($issued->invoice->customer_vrn)->toBe($setup['customer']->vrn);
 
     $stockLevel = (string) StockLevel::query()
         ->where('product_id', $setup['product']->id)
@@ -398,7 +426,7 @@ test('issuing invoice deducts exact stock and records allocations that sum to ba
         ->value('quantity');
     expect($stockLevel)->toBe('40.000');
 
-    $item = $issued->items->first();
+    $item = $issued->invoice->items->first();
     $allocations = $item->allocations;
     expect($allocations)->toHaveCount(1);
     expect($allocations->first()->base_quantity)->toBe('10.000')
@@ -469,7 +497,7 @@ test('FEFO split across two batches produces two allocations in correct order', 
 
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-FEFO-01');
 
-    $allocations = $issued->items->first()->allocations->sortBy('id')->values();
+    $allocations = $issued->invoice->items->first()->allocations->sortBy('id')->values();
     expect($allocations)->toHaveCount(2);
 
     expect($allocations[0]->batch_id)->toBe($batchEarly->id)
@@ -539,9 +567,9 @@ test('prices_include_tax both ways give the right totals', function () {
     ]);
     $issuedEx = app(IssueInvoice::class)($draftEx, 'IDEMP-TAX-EX');
     // net 100, vat 18 -> total 118
-    expect($issuedEx->subtotal)->toBe('100.00')
-        ->and($issuedEx->tax_total)->toBe('18.00')
-        ->and($issuedEx->total)->toBe('118.00');
+    expect($issuedEx->invoice->subtotal)->toBe('100.00')
+        ->and($issuedEx->invoice->tax_total)->toBe('18.00')
+        ->and($issuedEx->invoice->total)->toBe('118.00');
 
     // Case 2: Inclusive
     app(Settings::class)->put('tax.prices_include_tax', true);
@@ -552,9 +580,9 @@ test('prices_include_tax both ways give the right totals', function () {
     ]);
     $issuedIn = app(IssueInvoice::class)($draftIn, 'IDEMP-TAX-IN');
     // gross 118, vat extracted = 18.00, total = 118.00
-    expect($issuedIn->subtotal)->toBe('118.00')
-        ->and($issuedIn->tax_total)->toBe('18.00')
-        ->and($issuedIn->total)->toBe('118.00');
+    expect($issuedIn->invoice->subtotal)->toBe('118.00')
+        ->and($issuedIn->invoice->tax_total)->toBe('18.00')
+        ->and($issuedIn->invoice->total)->toBe('118.00');
 });
 
 test('credit limit block stops invoice issuance when configured to block', function () {
@@ -572,17 +600,33 @@ test('credit limit block stops invoice issuance when configured to block', funct
         'items' => [['product_id' => $setup['product']->id, 'quantity' => '2', 'unit_price' => '80.00']],
     ]);
 
+    $seqBefore = DB::table('document_sequences')->where('type', 'invoice')->value('last_number') ?? 0;
+    $movementsBefore = StockMovement::query()->where('product_id', $setup['product']->id)->count();
+
     // 2 * 80 + vat = 188.80, which exceeds credit_limit of 100.00
     expect(fn () => app(IssueInvoice::class)($draft, 'IDEMP-CREDIT-BLOCK'))
         ->toThrow(ValidationException::class);
 
     $draft->refresh();
-    expect($draft->status)->toBe(InvoiceStatus::Draft);
+    expect($draft->status)->toBe(InvoiceStatus::Draft)
+        ->and($draft->number)->toBeNull();
 
-    // Now change setting to warn -> should pass
+    // no number consumed
+    $seqAfter = DB::table('document_sequences')->where('type', 'invoice')->value('last_number') ?? 0;
+    expect($seqAfter)->toBe($seqBefore);
+
+    // no stock movement added, no allocation
+    expect(StockMovement::query()->where('product_id', $setup['product']->id)->count())->toBe($movementsBefore);
+    expect(InvoiceItemAllocation::query()
+        ->whereHas('item', fn ($q) => $q->where('invoice_id', $draft->id))
+        ->count())->toBe(0);
+
+    // Change setting to warn -> should pass and return a warning
     app(Settings::class)->put('customers.credit_limit_mode', 'warn');
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-CREDIT-WARN');
-    expect($issued->status)->toBe(InvoiceStatus::Issued);
+    expect($issued->invoice->status)->toBe(InvoiceStatus::Issued)
+        ->and($issued->creditWarning)->not->toBeNull()
+        ->and($issued->creditWarning)->toContain('Kilimo Bora Ltd');
 });
 
 test('same idempotency key returns the same invoice and does not post twice', function () {
@@ -604,9 +648,42 @@ test('same idempotency key returns the same invoice and does not post twice', fu
     $issued2 = app(IssueInvoice::class)($draft, 'IDEMP-SAME-KEY');
     $movementsCount2 = StockMovement::query()->where('product_id', $setup['product']->id)->count();
 
-    expect($issued1->id)->toBe($issued2->id)
-        ->and($issued1->number)->toBe($issued2->number)
+    expect($issued1->invoice->id)->toBe($issued2->invoice->id)
+        ->and($issued1->invoice->number)->toBe($issued2->invoice->number)
         ->and($movementsCount2)->toBe($movementsCount1);
+
+    // no warning on replay
+    expect($issued2->creditWarning)->toBeNull();
+});
+
+test('idempotency replay returns same invoice even after status changed to paid', function () {
+    $setup = invoiceTestSetup();
+    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $this->actingAs($user);
+
+    invoiceReceiveStock($setup['product'], $setup['location'], '20.000');
+
+    $draft = app(CreateInvoiceDraft::class)([
+        'customer_id' => $setup['customer']->id,
+        'location_id' => $setup['location']->id,
+        'items' => [['product_id' => $setup['product']->id, 'quantity' => '5', 'unit_price' => '10.00']],
+    ]);
+
+    $issued = app(IssueInvoice::class)($draft, 'IDEMP-REPLAY-PAID');
+    $movementsBefore = StockMovement::query()->where('product_id', $setup['product']->id)->count();
+
+    // Simulate the invoice being fully paid
+    $issued->invoice->update(['status' => InvoiceStatus::Paid, 'amount_paid' => $issued->invoice->total]);
+
+    // Replaying the same key must return the now-paid invoice without posting anything new
+    $replayed = app(IssueInvoice::class)($draft, 'IDEMP-REPLAY-PAID');
+
+    expect($replayed->invoice->id)->toBe($issued->invoice->id)
+        ->and($replayed->invoice->status)->toBe(InvoiceStatus::Paid)
+        ->and($replayed->creditWarning)->toBeNull();
+
+    // No additional stock movements
+    expect(StockMovement::query()->where('product_id', $setup['product']->id)->count())->toBe($movementsBefore);
 });
 
 test('issuing an already issued invoice with different idempotency key fails', function () {
@@ -625,7 +702,7 @@ test('issuing an already issued invoice with different idempotency key fails', f
     app(IssueInvoice::class)($draft, 'IDEMP-KEY-A');
 
     expect(fn () => app(IssueInvoice::class)($draft, 'IDEMP-KEY-B'))
-        ->toThrow(InvalidArgumentException::class);
+        ->toThrow(ValidationException::class);
 });
 
 test('user with invoices.issue but without customers.view can issue an invoice', function () {
@@ -644,7 +721,60 @@ test('user with invoices.issue but without customers.view can issue an invoice',
 
     // Should succeed without customers.view permission
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-NO-CUST-VIEW');
-    expect($issued->status)->toBe(InvoiceStatus::Issued);
+    expect($issued->invoice->status)->toBe(InvoiceStatus::Issued);
+});
+
+test('walk-in customer is allowed on pos channel invoice', function () {
+    $setup = invoiceTestSetup();
+    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $this->actingAs($user);
+
+    $walkIn = Customer::forceCreate([
+        'code' => 'WALK-IN-POS',
+        'name' => 'Walk-in Customer',
+        'type' => 'individual',
+        'is_active' => true,
+        'is_walk_in' => true,
+    ]);
+
+    invoiceReceiveStock($setup['product'], $setup['location'], '10.000');
+
+    // CreateInvoiceDraft only produces 'invoice' channel drafts; force-create a 'pos' draft directly
+    $draft = Invoice::forceCreate([
+        'channel' => 'pos',
+        'status' => InvoiceStatus::Draft,
+        'customer_id' => $walkIn->id,
+        'location_id' => $setup['location']->id,
+        'issue_date' => now()->toDateString(),
+        'currency' => 'TZS',
+        'prices_include_tax' => false,
+        'subtotal' => '10.00',
+        'discount_total' => '0.00',
+        'tax_total' => '0.00',
+        'total' => '10.00',
+        'amount_paid' => '0.00',
+        'created_by' => $user->id,
+    ]);
+
+    $draft->items()->create([
+        'product_id' => $setup['product']->id,
+        'description' => $setup['product']->name,
+        'sku' => $setup['product']->sku,
+        'unit_id' => $setup['unit']->id,
+        'quantity' => '1.000',
+        'base_quantity' => '1.000',
+        'unit_price' => '10.00',
+        'discount_amount' => '0.00',
+        'tax_type' => 'standard',
+        'tax_rate' => '0.00',
+        'line_tax' => '0.00',
+        'line_total' => '10.00',
+    ]);
+
+    // Walk-in is only blocked on 'invoice' channel; pos must succeed
+    $issued = app(IssueInvoice::class)($draft, 'IDEMP-POS-WALK-IN');
+    expect($issued->invoice->status)->toBe(InvoiceStatus::Issued)
+        ->and($issued->invoice->channel)->toBe('pos');
 });
 
 test('credit check at exactly the limit is allowed', function () {
@@ -665,7 +795,7 @@ test('credit check at exactly the limit is allowed', function () {
         'items' => [['product_id' => $setup['product']->id, 'quantity' => '1', 'unit_price' => '100.00']],
     ]);
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-CREDIT-AT-LIMIT');
-    expect($issued->status)->toBe(InvoiceStatus::Issued);
+    expect($issued->invoice->status)->toBe(InvoiceStatus::Issued);
 });
 
 test('credit check one cent over the limit is blocked', function () {
@@ -690,6 +820,17 @@ test('credit check one cent over the limit is blocked', function () {
 
     $draft->refresh();
     expect($draft->status)->toBe(InvoiceStatus::Draft);
+});
+
+test('credit_limit of zero is treated as no limit by CreditLimitService', function () {
+    // customers.credit_limit is NOT NULL DEFAULT 0 — null cannot arrive from the database.
+    // Zero (the column default) means "no credit limit configured"; the service always allows.
+    $setup = invoiceTestSetup(); // customer has credit_limit = '0.00'
+
+    app(Settings::class)->put('customers.credit_limit_mode', 'block');
+
+    $result = app(CreditLimitService::class)->evaluate($setup['customer'], '999999.99');
+    expect($result['outcome'])->toBe('within_limit');
 });
 
 test('issuing a draft with an idempotency key already used by a different invoice throws ValidationException', function () {
@@ -754,8 +895,8 @@ test('document numbering is sequential and rolled back on failure', function () 
     $issued2 = app(IssueInvoice::class)($draft2, 'IDEMP-SEQ-02');
 
     $year = now()->format('Y');
-    expect($issued1->number)->toBe("INV-{$year}-000001")
-        ->and($issued2->number)->toBe("INV-{$year}-000002");
+    expect($issued1->invoice->number)->toBe("INV-{$year}-000001")
+        ->and($issued2->invoice->number)->toBe("INV-{$year}-000002");
 });
 
 // ==========================================
@@ -788,7 +929,7 @@ test('voiding invoice returns exact quantities to exact batches with audit field
     ]);
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-VOID-01');
 
-    $voided = app(VoidInvoice::class)($issued, 'Customer order cancelled');
+    $voided = app(VoidInvoice::class)($issued->invoice, 'Customer order cancelled');
 
     expect($voided->status)->toBe(InvoiceStatus::Void)
         ->and($voided->voided_by)->toBe($user->id)
@@ -801,7 +942,7 @@ test('voiding invoice returns exact quantities to exact batches with audit field
     expect($levelA)->toBe('5.000')
         ->and($levelB)->toBe('10.000');
 
-    $allocations = InvoiceItemAllocation::query()->whereHas('item', fn ($q) => $q->where('invoice_id', $issued->id))->get();
+    $allocations = InvoiceItemAllocation::query()->whereHas('item', fn ($q) => $q->where('invoice_id', $issued->invoice->id))->get();
     expect($allocations)->toHaveCount(2);
     foreach ($allocations as $alloc) {
         expect($alloc->return_movement_id)->not->toBeNull();
@@ -821,7 +962,7 @@ test('voiding invoice requires a non-empty reason', function () {
     ]);
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-REASON-TEST');
 
-    expect(fn () => app(VoidInvoice::class)($issued, '   '))
+    expect(fn () => app(VoidInvoice::class)($issued->invoice, '   '))
         ->toThrow(ValidationException::class);
 });
 
@@ -839,21 +980,21 @@ test('cannot void a draft invoice, an already void invoice, or an invoice with p
 
     // Cannot void a draft
     expect(fn () => app(VoidInvoice::class)($draft, 'Cancel draft'))
-        ->toThrow(InvalidArgumentException::class);
+        ->toThrow(ValidationException::class);
 
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-VOID-RULES');
 
     // Cannot void when amount_paid > 0
-    $issued->update(['amount_paid' => '20.00']);
-    expect(fn () => app(VoidInvoice::class)($issued, 'Cancel paid'))
-        ->toThrow(InvalidArgumentException::class);
+    $issued->invoice->update(['amount_paid' => '20.00']);
+    expect(fn () => app(VoidInvoice::class)($issued->invoice, 'Cancel paid'))
+        ->toThrow(ValidationException::class);
 
-    $issued->update(['amount_paid' => '0.00']);
-    $voided = app(VoidInvoice::class)($issued, 'Cancel now');
+    $issued->invoice->update(['amount_paid' => '0.00']);
+    $voided = app(VoidInvoice::class)($issued->invoice, 'Cancel now');
 
     // Cannot void an already void invoice
     expect(fn () => app(VoidInvoice::class)($voided, 'Cancel again'))
-        ->toThrow(InvalidArgumentException::class);
+        ->toThrow(ValidationException::class);
 });
 
 test('ledger invariant holds after issue and after void', function () {
@@ -885,7 +1026,7 @@ test('ledger invariant holds after issue and after void', function () {
     expect(bccomp((string) $stockLevelSumAfterIssue, (string) $movementSumAfterIssue, 3))->toBe(0)
         ->and(bccomp((string) $stockLevelSumAfterIssue, '18.000', 3))->toBe(0);
 
-    app(VoidInvoice::class)($issued, 'Void for invariant test');
+    app(VoidInvoice::class)($issued->invoice, 'Void for invariant test');
 
     $stockLevelSumAfterVoid = StockLevel::query()->where('product_id', $setup['product']->id)->sum('quantity');
     $movementSumAfterVoid = StockMovement::query()->where('product_id', $setup['product']->id)->sum('quantity');
@@ -929,9 +1070,9 @@ test('cashier role can create and issue invoices but cannot void invoices', func
     expect($draft->status)->toBe(InvoiceStatus::Draft);
 
     $issued = app(IssueInvoice::class)($draft, 'IDEMP-CASHIER-01');
-    expect($issued->status)->toBe(InvoiceStatus::Issued);
+    expect($issued->invoice->status)->toBe(InvoiceStatus::Issued);
 
-    expect(fn () => app(VoidInvoice::class)($issued, 'Cashier trying to void'))
+    expect(fn () => app(VoidInvoice::class)($issued->invoice, 'Cashier trying to void'))
         ->toThrow(AuthorizationException::class);
 });
 

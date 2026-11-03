@@ -38,7 +38,7 @@ class CompleteInitialSetup
                 'email_verified_at' => now(),
             ]);
             $user->save();
-            $user->assignRole('Owner/Admin');
+            $user->assignRole('Admin');
             app(SetupStatus::class)->forget();
 
             app(Settings::class)->putMany([

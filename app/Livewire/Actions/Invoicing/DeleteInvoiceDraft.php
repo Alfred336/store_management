@@ -6,7 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
 
 class DeleteInvoiceDraft
 {
@@ -21,7 +21,7 @@ class DeleteInvoiceDraft
                 ->firstOrFail();
 
             if ($locked->status !== InvoiceStatus::Draft) {
-                throw new InvalidArgumentException('Only draft invoices can be deleted.');
+                throw ValidationException::withMessages(['invoice' => 'Only draft invoices can be deleted.']);
             }
 
             $locked->delete();

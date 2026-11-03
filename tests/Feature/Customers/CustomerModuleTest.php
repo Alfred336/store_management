@@ -58,6 +58,7 @@ test('customers can be created searched and updated with a unique transaction-sa
         ->set('email', 'SALES@MLIMANI.EXAMPLE')
         ->set('address', 'Dar es Salaam')
         ->set('tin', 'TIN-001')
+        ->set('vrn', 'VRN-001')
         ->set('creditLimit', '250000.00')
         ->set('paymentTermsDays', '30')
         ->set('isActive', true)
@@ -67,6 +68,7 @@ test('customers can be created searched and updated with a unique transaction-sa
     $customer = Customer::query()->where('name', 'Mlimani Traders')->firstOrFail();
     expect($customer->code)->toMatch('/^CUS-\d{4}-\d{6}$/')
         ->and($customer->email)->toBe('sales@mlimani.example')
+        ->and($customer->vrn)->toBe('VRN-001')
         ->and($customer->credit_limit)->toBe('250000.00')
         ->and($customer->payment_terms_days)->toBe(30);
 
@@ -235,8 +237,8 @@ test('deleting every user invalidates setup completion and allows first-run setu
 
 test('customers can be imported from CSV and exported to xlsx and CSV', function () {
     $user = customerPermissionsUser(['customers.view', 'customers.create']);
-    $csv = "name,type,phone,email,address,tin,notes,credit_limit,payment_terms_days,is_active\n".
-        "Lake Zone Stores,business,+255700000009,accounts@lakezone.example,Mwanza,TIN-009,Imported customer,75000.00,14,1\n";
+    $csv = "name,type,phone,email,address,tin,vrn,notes,credit_limit,payment_terms_days,is_active\n".
+        "Lake Zone Stores,business,+255700000009,accounts@lakezone.example,Mwanza,TIN-009,VRN-009,Imported customer,75000.00,14,1\n";
 
     Livewire::actingAs($user)->test(CustomersIndex::class)
         ->set('importFile', UploadedFile::fake()->createWithContent('customers.csv', $csv))
@@ -246,6 +248,7 @@ test('customers can be imported from CSV and exported to xlsx and CSV', function
     $this->assertDatabaseHas('customers', [
         'name' => 'Lake Zone Stores',
         'email' => 'accounts@lakezone.example',
+        'vrn' => 'VRN-009',
         'credit_limit' => '75000.00',
         'payment_terms_days' => 14,
     ]);

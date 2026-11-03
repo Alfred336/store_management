@@ -39,7 +39,7 @@ test('first-run setup creates one administrator and stores company details in se
         ->assertRedirect(route('dashboard'));
 
     $user = User::query()->where('email', 'owner@example.test')->firstOrFail();
-    expect($user->hasRole('Owner/Admin'))->toBeTrue()
+    expect($user->hasRole('Admin'))->toBeTrue()
         ->and($user->email_verified_at)->not->toBeNull()
         ->and(app(Settings::class)->get('business.name'))->toBe('Kilimanjaro Supplies')
         ->and(app(Settings::class)->get('business.currency'))->toBe('TZS');

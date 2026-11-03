@@ -78,7 +78,7 @@ test('correct password must be provided to delete account', function () {
     expect($user->fresh())->not->toBeNull();
 });
 
-dataset('last administrator roles', ['Admin', 'Owner/Admin']);
+dataset('last administrator roles', ['Admin']);
 
 test('the only Admin cannot delete their account and receives a clear message', function (string $roleName) {
     $role = Role::findOrCreate($roleName, 'web');

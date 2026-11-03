@@ -2,7 +2,7 @@
 
 ## 1. Authentication & Authorization
 - **Location**: `app/Livewire/Actions/Authorization`, `app/Policies`, `app/Providers/AppServiceProvider.php`
-- **Roles**: Owner/Admin, Admin, Storekeeper, Cashier, Accountant, Viewer.
+- **Roles**: Admin, Storekeeper, Cashier, Viewer.
 - **Permissions**: Resource-based permissions (`<resource>.view`, `<resource>.create`, `<resource>.update`, `<resource>.delete`, `<resource>.issue`, `<resource>.void`, `<resource>.print`).
 - **Policy enforcement**: All models enforce authorization via dedicated Policies (`InvoicePolicy`, `CustomerPolicy`, etc.).
 

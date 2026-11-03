@@ -19,7 +19,7 @@ class CustomersExport implements FromQuery, WithHeadings, WithMapping
     /** @return array<int, string> */
     public function headings(): array
     {
-        return ['code', 'name', 'type', 'phone', 'email', 'address', 'tin', 'notes', 'credit_limit', 'payment_terms_days', 'is_active'];
+        return ['code', 'name', 'type', 'phone', 'email', 'address', 'tin', 'vrn', 'notes', 'credit_limit', 'payment_terms_days', 'is_active'];
     }
 
     /** @param Customer $row
@@ -35,6 +35,7 @@ class CustomersExport implements FromQuery, WithHeadings, WithMapping
             $this->safeText($row->email ?? ''),
             $this->safeText($row->address ?? ''),
             $this->safeText($row->tin ?? ''),
+            $this->safeText($row->vrn ?? ''),
             $this->safeText($row->notes ?? ''),
             $this->safeText($row->credit_limit),
             $row->payment_terms_days,

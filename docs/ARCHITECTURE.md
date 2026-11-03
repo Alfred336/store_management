@@ -18,7 +18,7 @@ The active inventory CRUD modules are products, categories, units, and locations
 
 ## Authorization
 
-The `RoleSeeder` idempotently creates inventory, dashboard, settings, customer, invoice, payment and POS permissions. `Owner/Admin` and backwards-compatible `Admin` receive the current full permission set; `Storekeeper`, `Cashier`, `Accountant`, and `Viewer` receive role-scoped grants. Permissions for modules not yet implemented are provisioned as foundations only. Model policies are explicitly registered in `AppServiceProvider`. Navigation visibility is a convenience only; Livewire operations enforce policies server-side.
+The `RoleSeeder` idempotently creates inventory, dashboard, settings, customer, invoice, payment and POS permissions. Four canonical roles are provisioned: `Admin` receives the full permission set; `Storekeeper`, `Cashier`, and `Viewer` receive role-scoped grants. Permissions for modules not yet implemented are provisioned as foundations only. Model policies are explicitly registered in `AppServiceProvider`. Navigation visibility is a convenience only; Livewire operations enforce policies server-side.
 
 ## First-run and settings foundation
 
@@ -27,7 +27,7 @@ The `RoleSeeder` idempotently creates inventory, dashboard, settings, customer, 
 - The dashboard displays live inventory KPIs only. Sales and receivables metrics are intentionally not fabricated and will be wired when those modules exist.
 - PostgreSQL is the only supported database. PostgreSQL-specific SQL features such as partial indexes, `ILIKE`, and check constraints are intentionally used.
 - The positive setup-completed state is cached using Laravel's configured default cache store. Creating/deleting users invalidates it; cache flushes fall back to the persistent setting and users table.
-- The last `Admin`/`Owner/Admin` account cannot be deleted through the supported account policy and transactional delete Action; the policy also denies deactivation of the final Admin if a deactivation flow is introduced.
+- The last `Admin` account cannot be deleted through the supported account policy and transactional delete Action; the policy also denies deactivation of the final Admin if a deactivation flow is introduced.
 
 ## Customers
 

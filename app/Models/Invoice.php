@@ -44,17 +44,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $void_reason
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
- * @property string|null $creditWarning Transient runtime-only warning set by IssueInvoice when the
- *                                       credit limit is exceeded in 'warn' mode. Never persisted.
  */
 class Invoice extends Model
 {
-    /**
-     * Runtime-only credit-limit warning set by IssueInvoice when the customer's configured
-     * credit limit is exceeded in 'warn' mode.  Never stored in the database.
-     */
-    public ?string $creditWarning = null;
-
     protected $fillable = [
         'number', 'channel', 'status', 'customer_id', 'location_id',
         'issue_date', 'due_date', 'currency', 'prices_include_tax',

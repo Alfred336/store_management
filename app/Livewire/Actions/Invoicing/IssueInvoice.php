@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Actions\Invoicing;
 
+use App\DTOs\IssueInvoiceResult;
 use App\Enums\InvoiceStatus;
 use App\Livewire\Actions\Inventory\IssueStock;
 use App\Models\Customer;
@@ -32,11 +33,11 @@ class IssueInvoice
     /**
      * Issue a draft invoice.
      *
-     * The returned Invoice may have a non-null `$creditWarning` property when the customer's
-     * configured credit limit is exceeded but the store is set to 'warn' mode.  The caller
-     * (e.g. a Livewire component) should surface that message to the operator.
+     * Returns an IssueInvoiceResult whose `$creditWarning` is non-null when the customer's
+     * credit limit is exceeded and the store is configured to 'warn'.  The caller should
+     * surface that message to the operator.
      */
-    public function __invoke(Invoice $invoice, string $idempotencyKey): Invoice
+    public function __invoke(Invoice $invoice, string $idempotencyKey): IssueInvoiceResult
     {
         Gate::authorize('issue', $invoice);
 
@@ -44,21 +45,28 @@ class IssueInvoice
             throw new InvalidArgumentException('An idempotency key is required to issue an invoice.');
         }
 
-        return DB::transaction(function () use ($invoice, $idempotencyKey): Invoice {
+        return DB::transaction(function () use ($invoice, $idempotencyKey): IssueInvoiceResult {
             // 1. Lock the invoice row
             $locked = Invoice::query()
                 ->whereKey($invoice->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // 2. If already issued with the SAME idempotency_key return it unchanged without posting anything
-            if ($locked->status === InvoiceStatus::Issued && $locked->idempotency_key === $idempotencyKey) {
-                return $locked->load(['items.allocations', 'customer', 'location']);
+            // 2. If the SAME idempotency_key was used to post this invoice previously, return it
+            //    unchanged regardless of any subsequent status change (paid, void, etc.).
+            if ($locked->idempotency_key !== null
+                && $locked->idempotency_key === $idempotencyKey
+                && $locked->status !== InvoiceStatus::Draft
+            ) {
+                return new IssueInvoiceResult($locked->load(['items.allocations', 'customer', 'location']));
             }
 
-            // 3. If it is not a draft (or issued with a different key) throw a clear error
+            // 3. Only draft invoices may be issued; any other non-draft with a mismatched key
+            //    is a user error (wrong invoice, duplicate UI submission, etc.).
             if ($locked->status !== InvoiceStatus::Draft) {
-                throw new InvalidArgumentException("Invoice cannot be issued because it is not a draft (current status: {$locked->status->value}).");
+                throw ValidationException::withMessages([
+                    'invoice' => "Invoice cannot be issued because it is not a draft (current status: {$locked->status->value}).",
+                ]);
             }
 
             if (Invoice::query()->where('idempotency_key', $idempotencyKey)->where('id', '!=', $locked->id)->exists()) {
@@ -72,7 +80,7 @@ class IssueInvoice
             if (! $customer || ! $customer->is_active) {
                 throw ValidationException::withMessages(['customer_id' => 'An active customer is required.']);
             }
-            if ($customer->is_walk_in) {
+            if ($locked->channel === 'invoice' && $customer->is_walk_in) {
                 throw ValidationException::withMessages(['customer_id' => 'The Walk-in Customer is not allowed on invoice channel.']);
             }
 
@@ -125,20 +133,18 @@ class IssueInvoice
             // 6. Credit-limit check via CreditLimitService (which reads balances through
             //    CustomerBalance — no Gate anywhere in this call chain).
             //    'block'        → throw ValidationException; invoice stays as draft.
-            //    'warn'         → proceed; set $locked->creditWarning so the caller can surface it.
+            //    'warn'         → proceed; caller surfaces the warning.
             //    'within_limit' → proceed silently.
             $creditWarning = null;
-            if (bccomp((string) $customer->credit_limit, '0.00', 2) > 0) {
-                $creditEvaluation = $this->creditLimitService->evaluate($customer, (string) $locked->total);
-                if ($creditEvaluation['outcome'] === 'block') {
-                    throw ValidationException::withMessages([
-                        'customer_id' => "Credit limit exceeded for customer [{$customer->name}].",
-                    ]);
-                }
-                if ($creditEvaluation['outcome'] === 'warn') {
-                    $creditWarning = "Credit limit will be exceeded for customer [{$customer->name}]. "
-                        . "Projected balance: {$creditEvaluation['projected_balance']} / Limit: {$creditEvaluation['credit_limit']}.";
-                }
+            $creditEvaluation = $this->creditLimitService->evaluate($customer, (string) $locked->total);
+            if ($creditEvaluation['outcome'] === 'block') {
+                throw ValidationException::withMessages([
+                    'customer_id' => "Credit limit exceeded for customer [{$customer->name}].",
+                ]);
+            }
+            if ($creditEvaluation['outcome'] === 'warn') {
+                $creditWarning = "Credit limit will be exceeded for customer [{$customer->name}]. "
+                    ."Projected balance: {$creditEvaluation['projected_balance']} / Limit: {$creditEvaluation['credit_limit']}.";
             }
 
             // 7. Take the number with DocumentNumberingService::next('invoice')
@@ -180,16 +186,15 @@ class IssueInvoice
                 'customer_phone' => $customer->phone,
                 'customer_address' => $customer->address,
                 'customer_tin' => $customer->tin,
-                'customer_vrn' => null,
+                'customer_vrn' => $customer->vrn,
                 'issued_by' => auth()->id(),
                 'issued_at' => now(),
                 'idempotency_key' => $idempotencyKey,
             ]);
 
-            $result = $locked->fresh(['items.allocations', 'customer', 'location']);
-            $result->creditWarning = $creditWarning;
+            $invoice = $locked->fresh(['items.allocations', 'customer', 'location']);
 
-            return $result;
+            return new IssueInvoiceResult($invoice, $creditWarning);
         });
     }
 }

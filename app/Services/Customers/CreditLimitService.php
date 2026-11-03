@@ -27,6 +27,16 @@ class CreditLimitService
         $projectedBalance = $this->money->add($balance, $additionalCredit);
         $creditLimit = $customer->credit_limit;
 
+        // customers.credit_limit is NOT NULL DEFAULT 0; zero means no limit is configured.
+        if (bccomp((string) $creditLimit, '0', 2) <= 0) {
+            return [
+                'balance' => $balance,
+                'projected_balance' => $projectedBalance,
+                'credit_limit' => (string) $creditLimit,
+                'outcome' => 'within_limit',
+            ];
+        }
+
         if ($this->money->compare($projectedBalance, $creditLimit) <= 0) {
             $outcome = 'within_limit';
         } else {

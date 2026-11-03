@@ -9,7 +9,7 @@ use App\Services\Settings\Settings;
 use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
 
 class UpdateInvoiceDraft
 {
@@ -31,7 +31,7 @@ class UpdateInvoiceDraft
                 ->firstOrFail();
 
             if ($locked->status !== InvoiceStatus::Draft) {
-                throw new InvalidArgumentException('Only draft invoices can be updated.');
+                throw ValidationException::withMessages(['invoice' => 'Only draft invoices can be updated.']);
             }
 
             $prepared = (new ValidateAndPrepareInvoiceData(

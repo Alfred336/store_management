@@ -8,7 +8,6 @@ use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
-use InvalidArgumentException;
 
 class VoidInvoice
 {
@@ -34,15 +33,21 @@ class VoidInvoice
                 ->firstOrFail();
 
             if ($locked->status === InvoiceStatus::Draft) {
-                throw new InvalidArgumentException('Draft invoices cannot be voided.');
+                throw ValidationException::withMessages([
+                    'invoice' => 'Draft invoices cannot be voided.',
+                ]);
             }
 
             if ($locked->status === InvoiceStatus::Void) {
-                throw new InvalidArgumentException('Invoice is already void.');
+                throw ValidationException::withMessages([
+                    'invoice' => 'Invoice is already void.',
+                ]);
             }
 
             if (bccomp((string) $locked->amount_paid, '0.00', 2) > 0) {
-                throw new InvalidArgumentException('Payments must be reversed before voiding this invoice.');
+                throw ValidationException::withMessages([
+                    'invoice' => 'Payments must be reversed before voiding this invoice.',
+                ]);
             }
 
             $this->returnStock->__invoke($locked, $trimmedReason);

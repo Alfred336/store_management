@@ -57,6 +57,8 @@ class Index extends Component
 
     public string $tin = '';
 
+    public string $vrn = '';
+
     public string $notes = '';
 
     public string $creditLimit = '0.00';
@@ -124,6 +126,7 @@ class Index extends Component
             $this->email = $customer->email ?? '';
             $this->address = $customer->address ?? '';
             $this->tin = $customer->tin ?? '';
+            $this->vrn = $customer->vrn ?? '';
             $this->notes = $customer->notes ?? '';
             $this->creditLimit = $customer->credit_limit;
             $this->paymentTermsDays = (string) $customer->payment_terms_days;
@@ -233,6 +236,7 @@ class Index extends Component
         $this->email = '';
         $this->address = '';
         $this->tin = '';
+        $this->vrn = '';
         $this->notes = '';
         $this->creditLimit = '0.00';
         $this->paymentTermsDays = '0';
@@ -288,6 +292,7 @@ class Index extends Component
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string', 'max:2000'],
             'tin' => ['nullable', 'string', 'max:50'],
+            'vrn' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'creditLimit' => ['required', 'numeric', 'decimal:0,2', 'min:0'],
             'paymentTermsDays' => ['required', 'integer', 'between:0,365'],
@@ -301,6 +306,7 @@ class Index extends Component
             'email' => $data['email'] ?: null,
             'address' => $data['address'] ?: null,
             'tin' => $data['tin'] ?: null,
+            'vrn' => $data['vrn'] ?: null,
             'notes' => $data['notes'] ?: null,
             'credit_limit' => $data['creditLimit'],
             'payment_terms_days' => (int) $data['paymentTermsDays'],
