@@ -5,6 +5,7 @@ use App\Http\Controllers\Customers\CustomerStatementController;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Livewire\Dashboard\Index as DashboardIndex;
+use App\Livewire\Invoicing\Index as InvoicingIndex;
 use App\Livewire\Locations\Index as LocationsIndex;
 use App\Livewire\Products\Index as ProductsIndex;
 use App\Livewire\Settings\Index as BusinessSettingsIndex;
@@ -26,6 +27,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::livewire('categories', CategoriesIndex::class)->name('categories.index');
     Route::livewire('locations', LocationsIndex::class)->name('locations.index');
     Route::livewire('products', ProductsIndex::class)->name('products.index');
+
+    // Invoicing: invoice list.
+    Route::livewire('invoices', InvoicingIndex::class)->name('invoices.index');
 
     // Customers: list, export, and statement.
     Route::get('customers/export/{format}', CustomerExportController::class)->name('customers.export');

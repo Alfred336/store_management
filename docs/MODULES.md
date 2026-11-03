@@ -41,7 +41,19 @@
   - Idempotency key guarantees that retry requests return the existing invoice without duplicate stock deductions.
   - Zero stock leakage: inventory ledger movements match stock level balances at all times.
 
-## 5. Settings & Document Sequences
+## 5. Invoicing Screen (Phase 3A Part 2)
+- **Location**: `app/Livewire/Invoicing/Index.php`, `resources/views/livewire/invoicing/`
+- **Features**:
+  - Invoice list with search (number/customer name ILIKE), filters (status, date range, customer, location, overdue), sortable columns, and pagination.
+  - Overdue badge derived from `Invoice::isOverdue()` (posted status + past due date + non-zero balance).
+  - Create/edit draft flyout: searchable customer picker (excludes walk-in and inactive), active location picker, issue/due date with auto-fill from `payment_terms_days`, product search by name/SKU/barcode, line items with unit select/qty/unit price/discount, live totals via `InvoiceCalculator`, per-line non-expired stock hints.
+  - Details flyout: customer snapshot (live for drafts, immutable for issued/voided), line items with batch allocations, totals with balance, void reason, and full audit trail.
+  - Issue confirmation modal: shows invoice total, `$idempotencyKey` (server-generated, `#[Locked]`), handles `InsufficientStockException` and `ValidationException`, displays `IssueInvoiceResult->creditWarning`.
+  - Void confirmation modal: required reason, `ValidationException` error display.
+  - Delete confirmation modal: drafts only.
+  - Security: `authorize()` in `mount()` and every public action; `#[Locked]` on `$invoiceId` and `$idempotencyKey`; policy-gated action buttons.
+
+## 6. Settings & Document Sequences
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:
   - Key-value JSON settings store for company profile, currency, VAT rate, tax inclusion, credit limit enforcement mode.

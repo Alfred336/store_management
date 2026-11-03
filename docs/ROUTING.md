@@ -13,6 +13,7 @@ First-run setup is registered in the Initial setup section of `routes/web.php`, 
 | GET | `/categories` | `categories.index` | `App\Livewire\Categories\Index` |
 | GET | `/locations` | `locations.index` | `App\Livewire\Locations\Index` |
 | GET | `/products` | `products.index` | `App\Livewire\Products\Index` |
+| GET | `/invoices` | `invoices.index` | `App\Livewire\Invoicing\Index` |
 | GET | `/customers` | `customers.index` | `App\Livewire\Customers\Index` |
 | GET | `/customers/export/{format}` | `customers.export` | Authorized XLSX/CSV download (`format`: `xlsx` or `csv`) |
 | GET | `/customers/{customer}/statement` | `customers.statement` | Authorized customer statement PDF |

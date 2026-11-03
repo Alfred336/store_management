@@ -104,6 +104,12 @@ class Invoice extends Model
         return $this->belongsTo(User::class, 'issued_by');
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function voider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
+
     /**
      * Amount still owed. Computed from stored values with bcmath, never stored.
      *

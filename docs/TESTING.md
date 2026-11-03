@@ -53,8 +53,19 @@ Run code formatting and style fixes:
   - Customer statement balance includes only `issued`, `partially_paid`, and `paid` invoices; excludes drafts and voids.
   - Customer deletion blocked if any invoice exists.
 
-### 2. Customer Module Suite (`tests/Feature/Customers/CustomerModuleTest.php`)
+### 2. Invoicing Screen Suite (`tests/Feature/Invoicing/InvoiceScreenTest.php`)
+
+- **List & Filters**: Invoice list renders for users with `invoices.view`; search by number and customer name; status filter; overdue filter (past-due + non-zero balance).
+- **Create/Edit Draft**: Open form, select customer (walk-in excluded), add line item, store draft; edit and update draft.
+- **Walk-in Customer Guards**: Walk-in is absent from the customer search results; direct store with walk-in id fails validation.
+- **Issue Flow**: Issuing deducts stock via `IssueInvoice`; insufficient stock shows `$issueError` and invoice stays draft; same idempotency key issues only once with no duplicate movements; credit warning shown when customer is over limit in `warn` mode.
+- **Void Flow**: Void with a reason succeeds; void without a reason sets `$voidError` and modal stays open.
+- **Delete Flow**: Draft can be deleted from the screen.
+- **Authorization**: Viewer cannot create, issue, void or delete via direct calls; Cashier can issue but not void; only drafts can be edited or deleted.
+
+### 3. Customer Module Suite (`tests/Feature/Customers/CustomerModuleTest.php`)
+
 - Tests customer creation, search, statement generation, CSV import/export, and walk-in customer protection.
 
-### 3. Inventory & Stock Suite (`tests/Feature/Inventory/`)
+### 4. Inventory & Stock Suite (`tests/Feature/Inventory/`)
 - Tests CRUD operations for units, categories, locations, products, batch tracking, transfers, adjustments, and receipts.

@@ -1,5 +1,26 @@
 # Changelog
 
+## [Phase 3A Part 2] - 2026-11-03
+
+### Added
+
+- **Invoicing Screen** (`app/Livewire/Invoicing/Index.php`, `resources/views/livewire/invoicing/`):
+  - Invoice list with ILIKE search, status/date/customer/location/overdue filters, sortable columns, pagination, overdue badges, and balance column.
+  - Create/edit draft flyout: searchable customer picker (excludes walk-in/inactive), location picker, issue/due dates with auto-fill from `payment_terms_days`, product search by name/SKU/barcode, line items with unit/qty/price/discount, live totals via `InvoiceCalculator`, per-line non-expired stock hints via LEFT JOIN on `stock_levels`+`batches`.
+  - Details flyout: live customer data for drafts, immutable snapshots for issued/voided, batch allocation rows per line item, balance, void reason, and full audit trail (creator/issuer/voider with timestamps).
+  - Issue confirmation modal: `$idempotencyKey` generated server-side (`#[Locked]`), catches `InsufficientStockException` and `ValidationException`, displays `IssueInvoiceResult->creditWarning` with acknowledge-and-close option.
+  - Void confirmation modal: required reason, shows `ValidationException` messages.
+  - Delete confirmation modal: drafts only.
+- **Route**: `GET /invoices` → `invoices.index` (`App\Livewire\Invoicing\Index`).
+- **Sidebar**: Sales group now visible when user has `invoices.view` OR `customers.view`; Invoices link shown with `invoices.view`.
+- **`Invoice::voider()` relationship**: `BelongsTo<User>` via `voided_by` column, used for details panel eager loading.
+- **Invoicing Screen Test Suite** (`tests/Feature/Invoicing/InvoiceScreenTest.php`): 19 tests covering list/filters, draft CRUD, walk-in guards, issue/void/delete flows, idempotency, credit warning, and role-based authorization.
+- **Customer VRN field**: Added optional `vrn` field (max 50) to the customer form, details panel, CSV/Excel import and export, and `UpdateCustomer`/`CreateCustomer` validation.
+
+### Changed
+
+- `DeleteInvoiceDraft` and `UpdateInvoiceDraft` now throw `ValidationException::withMessages` instead of `InvalidArgumentException` for non-draft invoices (user-facing error, not a programmer error).
+
 ## [Phase 3A] - 2026-11-01
 
 ### Added

@@ -36,11 +36,16 @@
                         <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>Business settings</flux:sidebar.item>
                     </flux:sidebar.group>
                 @endcan
-                @can('viewAny', App\Models\Customer::class)
+                @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class))
                     <flux:sidebar.group heading="Sales" class="grid">
-                        <flux:sidebar.item icon="users" :href="route('customers.index')" :current="request()->routeIs('customers.*')" wire:navigate>Customers</flux:sidebar.item>
+                        @can('viewAny', App\Models\Invoice::class)
+                            <flux:sidebar.item icon="document-text" :href="route('invoices.index')" :current="request()->routeIs('invoices.*')" wire:navigate>Invoices</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', App\Models\Customer::class)
+                            <flux:sidebar.item icon="users" :href="route('customers.index')" :current="request()->routeIs('customers.*')" wire:navigate>Customers</flux:sidebar.item>
+                        @endcan
                     </flux:sidebar.group>
-                @endcan
+                @endif
             </flux:sidebar.nav>
 
             <flux:spacer />
