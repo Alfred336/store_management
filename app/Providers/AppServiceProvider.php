@@ -18,6 +18,8 @@ use App\Policies\ProductPolicy;
 use App\Policies\SettingPolicy;
 use App\Policies\UnitPolicy;
 use App\Policies\UserPolicy;
+use App\Services\Fiscal\FiscalProvider;
+use App\Services\Fiscal\NullFiscalProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(FiscalProvider::class, NullFiscalProvider::class);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Customers\CustomerExportController;
 use App\Http\Controllers\Customers\CustomerStatementController;
+use App\Http\Controllers\InvoicePdfController;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Livewire\Dashboard\Index as DashboardIndex;
@@ -28,8 +29,10 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::livewire('locations', LocationsIndex::class)->name('locations.index');
     Route::livewire('products', ProductsIndex::class)->name('products.index');
 
-    // Invoicing: invoice list.
+    // Invoicing: invoice list, PDF render, and saved document download.
     Route::livewire('invoices', InvoicingIndex::class)->name('invoices.index');
+    Route::get('invoices/{invoice}/pdf', [InvoicePdfController::class, 'render'])->name('invoices.pdf');
+    Route::get('invoices/{invoice}/documents/{document}', [InvoicePdfController::class, 'download'])->name('invoices.document.download');
 
     // Customers: list, export, and statement.
     Route::get('customers/export/{format}', CustomerExportController::class)->name('customers.export');

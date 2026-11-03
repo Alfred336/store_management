@@ -42,6 +42,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $voided_by
  * @property CarbonImmutable|null $voided_at
  * @property string|null $void_reason
+ * @property string|null $fiscal_number
+ * @property string|null $fiscal_verification_code
+ * @property string|null $fiscal_qr_payload
+ * @property string|null $fiscal_status
+ * @property CarbonImmutable|null $fiscal_submitted_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -55,6 +60,8 @@ class Invoice extends Model
         'customer_name', 'customer_phone', 'customer_address', 'customer_tin', 'customer_vrn',
         'idempotency_key', 'created_by', 'issued_by', 'issued_at',
         'voided_by', 'voided_at', 'void_reason',
+        'fiscal_number', 'fiscal_verification_code', 'fiscal_qr_payload',
+        'fiscal_status', 'fiscal_submitted_at',
     ];
 
     protected function casts(): array
@@ -65,6 +72,7 @@ class Invoice extends Model
             'due_date' => 'date',
             'issued_at' => 'datetime',
             'voided_at' => 'datetime',
+            'fiscal_submitted_at' => 'datetime',
             'prices_include_tax' => 'boolean',
             'subtotal' => 'decimal:2',
             'discount_total' => 'decimal:2',
@@ -108,6 +116,12 @@ class Invoice extends Model
     public function voider(): BelongsTo
     {
         return $this->belongsTo(User::class, 'voided_by');
+    }
+
+    /** @return HasMany<InvoiceDocument, $this> */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(InvoiceDocument::class);
     }
 
     /**

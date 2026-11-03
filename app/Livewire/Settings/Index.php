@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Enums\InvoiceTemplate;
 use App\Livewire\Actions\Settings\UpdateBusinessSettings;
 use App\Models\Setting;
 use App\Services\Settings\Settings as SettingsService;
@@ -45,6 +46,16 @@ class Index extends Component
 
     public string $creditLimitMode = 'warn';
 
+    public string $bankDetails = '';
+
+    public string $footerTerms = '';
+
+    public string $defaultTemplate = 'classic';
+
+    public string $defaultPaper = 'A4';
+
+    public string $receiptWidth = '80mm';
+
     public function mount(SettingsService $settings): void
     {
         $this->authorize('viewAny', Setting::class);
@@ -64,6 +75,11 @@ class Index extends Component
         $this->resetYearly = (bool) $settings->get('numbering.reset_yearly', true);
         $this->numberDigits = (string) $settings->get('numbering.digits', '6');
         $this->creditLimitMode = (string) $settings->get('customers.credit_limit_mode', 'warn');
+        $this->bankDetails = (string) $settings->get('business.bank_details', '');
+        $this->footerTerms = (string) $settings->get('business.footer_terms', '');
+        $this->defaultTemplate = (string) $settings->get('invoicing.default_template', InvoiceTemplate::default()->value);
+        $this->defaultPaper = (string) $settings->get('invoicing.default_paper', InvoiceTemplate::default()->defaultPaper());
+        $this->receiptWidth = (string) $settings->get('pos.receipt_width', '80mm');
     }
 
     public function save(UpdateBusinessSettings $updateBusinessSettings): void
@@ -86,6 +102,11 @@ class Index extends Component
             'resetYearly' => ['required', 'boolean'],
             'numberDigits' => ['required', 'integer', 'between:1,12'],
             'creditLimitMode' => ['required', Rule::in(['warn', 'block'])],
+            'bankDetails' => ['nullable', 'string', 'max:1000'],
+            'footerTerms' => ['nullable', 'string', 'max:1000'],
+            'defaultTemplate' => ['required', Rule::in(array_column(InvoiceTemplate::cases(), 'value'))],
+            'defaultPaper' => ['required', Rule::in(InvoiceTemplate::allPapers())],
+            'receiptWidth' => ['required', Rule::in(['80mm', '58mm'])],
         ]);
 
         $updateBusinessSettings([
@@ -104,6 +125,11 @@ class Index extends Component
             'reset_yearly' => (bool) $data['resetYearly'],
             'number_digits' => (int) $data['numberDigits'],
             'credit_limit_mode' => $data['creditLimitMode'],
+            'bank_details' => $data['bankDetails'] ?: null,
+            'footer_terms' => $data['footerTerms'] ?: null,
+            'default_template' => $data['defaultTemplate'],
+            'default_paper' => $data['defaultPaper'],
+            'receipt_width' => $data['receiptWidth'],
         ]);
 
         Flux::toast(variant: 'success', text: 'Business settings saved.');

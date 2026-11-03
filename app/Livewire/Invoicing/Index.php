@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Invoicing;
 
+use App\Enums\InvoiceTemplate;
 use App\Exceptions\InsufficientStockException;
 use App\Livewire\Actions\Invoicing\CreateInvoiceDraft;
 use App\Livewire\Actions\Invoicing\DeleteInvoiceDraft;
@@ -10,9 +11,11 @@ use App\Livewire\Actions\Invoicing\UpdateInvoiceDraft;
 use App\Livewire\Actions\Invoicing\VoidInvoice;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\InvoiceDocument;
 use App\Models\Location;
 use App\Models\Product;
 use App\Services\Invoicing\InvoiceCalculator;
+use App\Services\Settings\Settings;
 use Carbon\Carbon;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -104,12 +107,25 @@ class Index extends Component
 
     public ?string $voidError = null;
 
+    // ─── Print / PDF ──────────────────────────────────────────────────────
+    public string $printTemplate = 'classic';
+
+    public string $printPaper = 'A4';
+
     // ─────────────────────────────────────────────────────────────────────
 
-    public function mount(): void
+    public function mount(Settings $settings): void
     {
         $this->authorize('viewAny', Invoice::class);
         $this->issueDate = now()->toDateString();
+        $this->printTemplate = (string) $settings->get('invoicing.default_template', InvoiceTemplate::default()->value);
+        $this->printPaper = (string) $settings->get('invoicing.default_paper', InvoiceTemplate::default()->defaultPaper());
+    }
+
+    public function updatedPrintTemplate(): void
+    {
+        $template = InvoiceTemplate::tryFrom($this->printTemplate) ?? InvoiceTemplate::default();
+        $this->printPaper = $template->defaultPaper();
     }
 
     public function updatedSearch(): void
@@ -580,10 +596,25 @@ class Index extends Component
             $issuingInvoice = Invoice::query()->find($this->invoiceId);
         }
 
+        // Saved PDF documents for the details panel
+        $printDocuments = [];
+        if ($this->showDetails && $this->invoiceId !== null) {
+            $printDocuments = InvoiceDocument::query()
+                ->where('invoice_id', $this->invoiceId)
+                ->where('action', 'save')
+                ->latest()
+                ->get()
+                ->all();
+        }
+
+        // Template options for the picker
+        $templates = InvoiceTemplate::cases();
+
         return view('livewire.invoicing.index', compact(
             'invoices', 'customerResults', 'productResults',
             'liveTotals', 'stockHints', 'locations',
-            'selectedInvoice', 'issuingInvoice'
+            'selectedInvoice', 'issuingInvoice',
+            'printDocuments', 'templates'
         ));
     }
 

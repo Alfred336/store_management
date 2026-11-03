@@ -53,8 +53,22 @@
   - Delete confirmation modal: drafts only.
   - Security: `authorize()` in `mount()` and every public action; `#[Locked]` on `$invoiceId` and `$idempotencyKey`; policy-gated action buttons.
 
-## 6. Settings & Document Sequences
+## 6. Invoice PDF Generation (Phase 3B)
+- **Location**: `app/Enums/InvoiceTemplate.php`, `app/Livewire/Actions/Invoicing/RenderInvoiceDocument.php`, `app/Services/Invoicing/InvoiceDocumentData.php`, `app/Http/Controllers/InvoicePdfController.php`, `app/Models/InvoiceDocument.php`
+- **Templates**: `InvoiceTemplate` enum — `classic`, `modern`, `minimal`, `compact` (A4/A5), `thermal` (80mm/58mm). Blade templates live under `resources/views/invoices/templates/`.
+- **PDF Engine**: `barryvdh/laravel-dompdf ^3.1` with remote access disabled; DejaVu Sans; logo embedded as base64 data-URI from a local path.
+- **Action** `RenderInvoiceDocument`:
+  - Authorizes via `invoices.print` policy.
+  - For issued (posted) invoices: wraps render + `InvoiceDocument` row creation in a transaction with `lockForUpdate()` on the invoice; the first row per invoice has `is_duplicate = false`, all subsequent have `is_duplicate = true`.
+  - For drafts/void invoices: renders with the DRAFT/VOID watermark but persists no record.
+  - `save` action stores the file on the private `local` disk at `invoices/{year}/{slug}.pdf` and records `size_bytes` and `sha256`.
+- **Fiscal extension**: `FiscalProvider` interface bound to `NullFiscalProvider` in `AppServiceProvider`. Templates show a fiscal block only when `FiscalProvider::getData()` returns non-null.
+- **Routes**: `GET /invoices/{invoice}/pdf` (`invoices.pdf`) and `GET /invoices/{invoice}/documents/{document}` (`invoices.document.download`) under the authenticated group.
+- **Print panel UI**: Template picker, paper picker (filtered by template's supported papers), preview iframe, Print/Download/Save buttons, and a saved-documents table with original/duplicate badges.
+
+## 7. Settings & Document Sequences
+
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:
-  - Key-value JSON settings store for company profile, currency, VAT rate, tax inclusion, credit limit enforcement mode.
+  - Key-value JSON settings store for company profile, currency, VAT rate, tax inclusion, credit limit enforcement mode, invoice printing defaults (`invoicing.default_template`, `invoicing.default_paper`, `pos.receipt_width`), and document footer (`business.bank_details`, `business.footer_terms`).
   - Atomic sequence allocation per document type (`invoice`, `receipt`, `payment`, `customer`) and year.

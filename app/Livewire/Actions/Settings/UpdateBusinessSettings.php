@@ -30,6 +30,11 @@ class UpdateBusinessSettings
             'numbering.reset_yearly' => $data['reset_yearly'],
             'numbering.digits' => $data['number_digits'],
             'customers.credit_limit_mode' => $data['credit_limit_mode'],
+            'business.bank_details' => $data['bank_details'],
+            'business.footer_terms' => $data['footer_terms'],
+            'invoicing.default_template' => $data['default_template'],
+            'invoicing.default_paper' => $data['default_paper'],
+            'pos.receipt_width' => $data['receipt_width'],
         ]);
     }
 }

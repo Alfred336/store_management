@@ -34,6 +34,22 @@ The schema contains the Laravel/auth tables, Spatie Permission tables, inventory
 - When an invoice is voided, `ReturnStock` reads these exact allocations to return stock to the original batches and records `return_movement_id`.
 - Ensures zero inventory leakage and guarantees that FEFO batch distributions are accurately reversed on void.
 
+### `invoice_documents` (Phase 3B)
+
+- Tracks every print, download, or save of an invoice PDF.
+- `template_key` (string) and `paper` (string) record what was rendered.
+- `action CHECK (action IN ('print', 'download', 'save'))`.
+- `is_duplicate` (boolean): the first row per invoice is `false`; all subsequent rows are `true`. Determined inside a transaction with `lockForUpdate()` on the invoice row to prevent two simultaneous renders both claiming to be the original.
+- `path` (nullable): populated only for `save` action; stores the file at `invoices/{year}/{slug}.pdf` on the private `local` disk.
+- `size_bytes` and `sha256` (nullable): populated together with `path`.
+- `generated_by` FK → `users` with `nullOnDelete`; `invoice_id` FK → `invoices` with `restrictOnDelete`.
+
+### Fiscal columns on `invoices` (Phase 3B)
+
+- Nullable columns `fiscal_number`, `fiscal_verification_code`, `fiscal_qr_payload`, `fiscal_status`, `fiscal_submitted_at` added via additive migration.
+- Populated by a `FiscalProvider` integration; the default `NullFiscalProvider` reads and returns them as-is.
+- Invoice PDF templates show the fiscal block only when `fiscal_number` is non-null.
+
 ## Settings and document numbering
 
 - `settings` is a key/value table. Values are JSON-encoded text so booleans and numeric settings retain scalar types; all company profile, VAT, currency and numbering preferences live here.

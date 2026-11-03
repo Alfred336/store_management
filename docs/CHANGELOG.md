@@ -1,5 +1,21 @@
 # Changelog
 
+## [Phase 3B] - 2026-11-04
+
+### Added
+
+- **`InvoiceTemplate` enum** (`app/Enums/InvoiceTemplate.php`): five values (`classic`, `modern`, `minimal`, `compact`, `thermal`) with `label()`, `supportedPapers()`, `defaultPaper()`, `isThermal()`, and `default()`.
+- **Five Blade templates** (`resources/views/invoices/templates/`): classic, modern, minimal, compact (A5), thermal (receipt). All use DejaVu Sans, tables-only CSS for dompdf, watermark `position:fixed` rotated div, and conditional fiscal block.
+- **`InvoiceDocumentData` service** (`app/Services/Invoicing/InvoiceDocumentData.php`): builds the complete view-model (company, header, customer snapshot, lines, totals, fiscal, watermark, notes, terms). Logo embedded as base64 data-URI from a local file path. `amountInWords()` converts TZS (and other currencies) to English words.
+- **`RenderInvoiceDocument` action** (`app/Livewire/Actions/Invoicing/RenderInvoiceDocument.php`): authorizes via `invoices.print`; wraps render + `InvoiceDocument` creation in a locked transaction for posted invoices; draft/void invoices render only without DB record; `save` action stores to `invoices/{year}/{slug}.pdf`.
+- **`InvoiceDocument` model and migration** (`database/migrations/2026_11_04_000001_create_invoice_documents_table.php`): tracks template, paper, action, is_duplicate, path, size_bytes, sha256, generated_by per render.
+- **Fiscal extension point**: `FiscalProvider` interface and `NullFiscalProvider` (reads nullable fiscal columns); bound in `AppServiceProvider`; fiscal columns added to `invoices` via `database/migrations/2026_11_04_000002_add_fiscal_columns_to_invoices_table.php`.
+- **`InvoicePdfController`** (`app/Http/Controllers/InvoicePdfController.php`): `render` streams PDF inline or as attachment; `download` streams a saved file from the private disk.
+- **Routes**: `GET /invoices/{invoice}/pdf` (`invoices.pdf`) and `GET /invoices/{invoice}/documents/{document}` (`invoices.document.download`) added to the authenticated group in `routes/web.php`.
+- **Print panel UI**: template picker, paper picker (filtered to template's `supportedPapers()`), preview iframe, Print/Download/Save buttons, and a saved-documents table with original/duplicate badges in the invoice details flyout.
+- **Settings additions**: `invoicing.default_template`, `invoicing.default_paper`, `pos.receipt_width`, `business.bank_details`, `business.footer_terms` — added to `Settings\Index`, `UpdateBusinessSettings`, and the settings view.
+- **`InvoiceDocumentTest` suite** (`tests/Feature/Invoicing/InvoiceDocumentTest.php`): 27 tests covering template/paper rendering, customer snapshot immutability, original/duplicate logic, draft/void watermarks, save-to-disk, auth, input validation, logo embedding, remote-access config, amount-in-words, and fiscal data.
+
 ## [Phase 3A Part 2] - 2026-11-03
 
 ### Added

@@ -131,6 +131,13 @@
                 @endif
             </section>
 
+            {{-- Print panel (issued/partially-paid/paid only) --}}
+            @can('print', $inv)
+                @if($inv->status->isPosted())
+                    @include('livewire.invoicing.partials.print-panel')
+                @endif
+            @endcan
+
             <div class="flex justify-end"><flux:button variant="primary" wire:click="closeDetails">Done</flux:button></div>
         </div>
     @endif
