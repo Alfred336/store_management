@@ -36,8 +36,11 @@
                         <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>Business settings</flux:sidebar.item>
                     </flux:sidebar.group>
                 @endcan
-                @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class) || auth()->user()?->can('viewAny', App\Models\Payment::class))
+                @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class) || auth()->user()?->can('viewAny', App\Models\Payment::class) || auth()->user()?->can('pos.use'))
                     <flux:sidebar.group heading="Sales" class="grid">
+                        @can('pos.use')
+                            <flux:sidebar.item icon="computer-desktop" :href="route('pos.index')" :current="request()->routeIs('pos.*')" wire:navigate>Point of Sale</flux:sidebar.item>
+                        @endcan
                         @can('viewAny', App\Models\Invoice::class)
                             <flux:sidebar.item icon="document-text" :href="route('invoices.index')" :current="request()->routeIs('invoices.*')" wire:navigate>Invoices</flux:sidebar.item>
                         @endcan

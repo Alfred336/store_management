@@ -57,6 +57,8 @@ class Index extends Component
 
     public string $reorderLevel = '0.000';
 
+    public string $sellingPrice = '0.00';
+
     public bool $trackBatches = false;
 
     public bool $isActive = true;
@@ -120,6 +122,7 @@ class Index extends Component
             $this->categoryId = $product->category_id === null ? null : (string) $product->category_id;
             $this->baseUnitId = (string) $product->base_unit_id;
             $this->reorderLevel = $product->reorder_level;
+            $this->sellingPrice = $product->selling_price;
             $this->trackBatches = $product->track_batches;
             $this->isActive = $product->is_active;
             $this->description = $product->description ?? '';
@@ -247,6 +250,7 @@ class Index extends Component
         $this->categoryId = null;
         $this->baseUnitId = null;
         $this->reorderLevel = '0.000';
+        $this->sellingPrice = '0.00';
         $this->trackBatches = false;
         $this->isActive = true;
         $this->description = '';
@@ -339,6 +343,7 @@ class Index extends Component
             'categoryId' => ['nullable', 'integer', 'exists:categories,id'],
             'baseUnitId' => ['required', 'integer', 'exists:units,id'],
             'reorderLevel' => ['required', 'numeric', 'decimal:0,3', 'min:0'],
+            'sellingPrice' => ['required', 'numeric', 'decimal:0,2', 'min:0'],
             'trackBatches' => ['required', 'boolean'],
             'isActive' => ['required', 'boolean'],
             'description' => ['nullable', 'string'],
@@ -355,6 +360,7 @@ class Index extends Component
             'category_id' => $data['categoryId'] ?: null,
             'base_unit_id' => $data['baseUnitId'],
             'reorder_level' => $data['reorderLevel'],
+            'selling_price' => $data['sellingPrice'],
             'track_batches' => $data['trackBatches'],
             'is_active' => $data['isActive'],
             'description' => $data['description'] ?: null,

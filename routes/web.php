@@ -11,6 +11,7 @@ use App\Livewire\Invoicing\Index as InvoicingIndex;
 use App\Livewire\Locations\Index as LocationsIndex;
 use App\Livewire\Payments\Index as PaymentsIndex;
 use App\Livewire\Products\Index as ProductsIndex;
+use App\Livewire\Sales\Pos\Index as PosIndex;
 use App\Livewire\Settings\Index as BusinessSettingsIndex;
 use App\Livewire\Setup\Index as SetupIndex;
 use App\Livewire\Units\Index as UnitsIndex;
@@ -48,7 +49,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::livewire('payments', PaymentsIndex::class)->name('payments.index');
     Route::get('payments/{payment}/receipt', PaymentReceiptController::class)->name('payments.receipt');
 
-    // Later modules: POS, reports, and administration routes are added here.
+    // Point of Sale.
+    Route::livewire('pos', PosIndex::class)->name('pos.index');
 });
 
 require __DIR__.'/settings.php';

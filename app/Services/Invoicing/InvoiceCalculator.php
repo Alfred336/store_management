@@ -13,7 +13,7 @@ class InvoiceCalculator
 
     /**
      * @param  array<int, array{quantity: string|int, unit_price: string|int, discount_amount?: string|int, tax_type?: string}>  $lines
-     * @return array{subtotal: string, discount_total: string, tax_total: string, total: string, lines: array<int, array{line_subtotal: string, discount_amount: string, line_tax: string, line_total: string} & array<string, mixed>>}
+     * @return array{subtotal: numeric-string, discount_total: numeric-string, tax_total: numeric-string, total: numeric-string, lines: array<int, array{line_subtotal: numeric-string, discount_amount: numeric-string, line_tax: numeric-string, line_total: numeric-string} & array<string, mixed>>}
      */
     public function calculate(array $lines): array
     {

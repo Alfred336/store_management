@@ -14,6 +14,7 @@
                 <flux:select wire:model="baseUnitId" label="Base unit" required><option value="">Select a unit</option>@foreach ($units as $unit)<option value="{{ $unit->id }}">{{ $unit->name }} ({{ $unit->abbreviation }})</option>@endforeach</flux:select>
             @endif
             <flux:input wire:model="reorderLevel" label="Reorder level (base units)" type="number" min="0" step="0.001" required />
+            <flux:input wire:model="sellingPrice" label="Selling price" type="number" min="0" step="0.01" required />
             <flux:textarea wire:model="description" label="Description" rows="3" />
             @if ($productId && $hasMovements)
                 <flux:checkbox wire:model="trackBatches" label="Track batches (locked)" disabled />

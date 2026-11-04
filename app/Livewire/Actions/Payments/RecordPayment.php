@@ -133,11 +133,14 @@ class RecordPayment
                 'provider' => $data['provider'] ?? null,
                 'reference' => $data['reference'] ?? null,
                 'amount' => $data['amount'],
+                'amount_tendered' => $data['amount_tendered'] ?? null,
+                'change_given' => $data['change_given'] ?? null,
                 'received_at' => $data['received_at'] ?? now(),
                 'received_by' => auth()->id(),
                 'status' => 'active',
                 'notes' => $data['notes'] ?? null,
                 'idempotency_key' => $idempotencyKey,
+                'pos_session_id' => $data['pos_session_id'] ?? null,
             ]);
 
             // Apply allocations

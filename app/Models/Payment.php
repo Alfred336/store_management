@@ -17,6 +17,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $provider
  * @property string|null $reference
  * @property numeric-string $amount
+ * @property numeric-string|null $amount_tendered
+ * @property numeric-string|null $change_given
+ * @property int|null $pos_session_id
  * @property CarbonImmutable $received_at
  * @property int $received_by
  * @property string $status active|reversed
@@ -32,15 +35,18 @@ class Payment extends Model
 {
     protected $fillable = [
         'number', 'customer_id', 'method', 'provider', 'reference',
-        'amount', 'received_at', 'received_by', 'status',
+        'amount', 'amount_tendered', 'change_given',
+        'received_at', 'received_by', 'status',
         'reversed_by', 'reversed_at', 'reverse_reason', 'notes',
-        'idempotency_key',
+        'idempotency_key', 'pos_session_id',
     ];
 
     protected function casts(): array
     {
         return [
             'amount' => 'decimal:2',
+            'amount_tendered' => 'decimal:2',
+            'change_given' => 'decimal:2',
             'received_at' => 'datetime',
             'reversed_at' => 'datetime',
         ];
@@ -68,6 +74,12 @@ class Payment extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(PaymentAllocation::class);
+    }
+
+    /** @return BelongsTo<PosSession, $this> */
+    public function posSession(): BelongsTo
+    {
+        return $this->belongsTo(PosSession::class);
     }
 
     /**

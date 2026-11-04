@@ -26,6 +26,12 @@ Authorization uses **Spatie Permission** (role/permission guards):
 | `payments.create` | Cashier, Manager | Record payments |
 | `payments.reverse` | Manager | Reverse active payments with reason |
 | `inventory.*` | Manager, Warehouse Staff | Inventory CRUD and stock operations |
+| `pos.use` | Cashier, Manager | Access POS screen and perform sales |
+| `pos.open_session` | Cashier, Manager | Open a POS session |
+| `pos.close_session` | Cashier, Manager | Close own POS session |
+| `pos.close_any_session` | Manager | Force-close another user's POS session |
+| `pos.discount` | Cashier, Manager | Apply line-item discounts in POS |
+| `pos.credit_sale` | Cashier, Manager | Issue a POS invoice on credit (no cash collected) |
 
 Each Livewire action calls `$this->authorize(...)` or `Gate::authorize(...)` as the **first line** of every public method. All record IDs exposed in components are marked `#[Locked]` to prevent client-side tampering.
 

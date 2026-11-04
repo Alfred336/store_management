@@ -118,3 +118,12 @@ Run code formatting and style fixes:
 ### 7. Inventory & Stock Suite (`tests/Feature/Inventory/`)
 
 - Tests CRUD operations for units, categories, locations, products, batch tracking, transfers, adjustments, and receipts.
+
+### 8. POS Suite (`tests/Feature/Pos/PosModuleTest.php`)
+
+- **Session Management**: Cashier opens a session; duplicate open session is blocked; closing computes `expected_cash` and `difference`; manager force-closes another user's session; non-owner without `pos.close_any_session` is blocked.
+- **Sale Completion**: `CompletePosSale` issues RCT-numbered invoice; uses `selling_price` as default unit price; records `amount_tendered` and `change_given` on cash payments; aggregates multiple tenders across separate `Payment` rows.
+- **Credit Sales**: Requires `pos.credit_sale` permission; `warn` outcome treated as `block` at POS; walk-in customer cannot take a credit sale.
+- **Stock**: Insufficient stock throws `InsufficientStockException`.
+- **Held Sales**: `HoldSale` saves the cart without touching stock or numbering; `ResumeSale` restores the cart and deletes the held record; `voidHeldSale` deletes the record via Livewire.
+- **Authorization**: Route returns 403 for user without `pos.use`.

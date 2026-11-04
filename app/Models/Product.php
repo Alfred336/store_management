@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-/** @property numeric-string $reorder_level */
+/**
+ * @property numeric-string $reorder_level
+ * @property numeric-string $selling_price
+ */
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
@@ -27,6 +30,7 @@ class Product extends Model
         'category_id',
         'base_unit_id',
         'reorder_level',
+        'selling_price',
         'track_batches',
         'description',
         'is_active',
@@ -37,6 +41,7 @@ class Product extends Model
     {
         return [
             'reorder_level' => 'decimal:3',
+            'selling_price' => 'decimal:2',
             'barcode' => 'string',
             'track_batches' => 'boolean',
             'is_active' => 'boolean',

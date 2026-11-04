@@ -294,7 +294,7 @@ class Index extends Component
             'unit_id' => (int) $product->base_unit_id,
             'available_units' => $this->buildAvailableUnits($product),
             'quantity' => '1.000',
-            'unit_price' => '0.00',
+            'unit_price' => number_format((float) $product->selling_price, 2, '.', ''),
             'discount_amount' => '0.00',
         ];
         $this->productSearch = '';

@@ -82,7 +82,25 @@
   - Customer outstanding balance subtracts unallocated credit from active payments.
   - `DeleteCustomer` is blocked when the customer has any payment records.
 
-## 8. Settings & Document Sequences
+## 8. Point of Sale (Phase 5)
+
+- **Location**: `app/Livewire/Sales/Pos/Index.php`, `app/Livewire/Actions/Sales/`, `app/Models/PosSession.php`, `app/Models/PosHeldSale.php`
+- **Layout**: Full-screen (no sidebar) using `resources/views/layouts/pos.blade.php`.
+- **Actions**:
+  - `OpenPosSession`: Creates a session for the authenticated user at a given location; enforces one open session per user via partial unique index.
+  - `ClosePosSession`: Closes the session and computes `expected_cash` (opening + cash payments) and `difference`; cashier closes own session, manager can close any.
+  - `CompletePosSale`: Creates a POS draft invoice inline (bypasses walk-in guard in `ValidateAndPrepareInvoiceData`), issues it via `IssueInvoice` (uses RCT sequence), and records each tender as a `Payment` allocated to the invoice; `change_given` stored on the cash payment.
+  - `HoldSale`: Saves a cart as a `PosHeldSale` row without touching stock, numbering, or payments.
+  - `ResumeSale`: Restores the cart from a held sale and deletes the held record.
+- **Permissions**: `pos.use`, `pos.open_session`, `pos.close_session`, `pos.close_any_session`, `pos.discount`, `pos.credit_sale`.
+- **Credit sales**: Allowed only for named (non-walk-in) customers with `pos.credit_sale`; `warn` outcome is treated as `block` at POS.
+- **Products**: `selling_price` field added; used as default `unit_price` in both the invoice form and the POS cart.
+- **Invariants**:
+  - Only one open session per user (partial unique index).
+  - Held sales never touch stock or document sequences.
+  - Tenders sum must ≥ invoice total for cash sales; credit sales require the named customer to be within credit limit.
+
+## 9. Settings & Document Sequences
 
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:

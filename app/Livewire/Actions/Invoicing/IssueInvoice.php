@@ -147,8 +147,8 @@ class IssueInvoice
                     ."Projected balance: {$creditEvaluation['projected_balance']} / Limit: {$creditEvaluation['credit_limit']}.";
             }
 
-            // 7. Take the number with DocumentNumberingService::next('invoice')
-            $number = $this->numberingService->next('invoice');
+            // 7. Take the number; POS receipts use the 'receipt' sequence (RCT-…).
+            $number = $this->numberingService->next($locked->channel === 'pos' ? 'receipt' : 'invoice');
 
             // 8. Process items with IssueStock in consistent order by product_id
             $orderedItems = $items->sortBy('product_id');

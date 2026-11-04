@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property InvoiceStatus $status
  * @property int $customer_id
  * @property int $location_id
+ * @property int|null $pos_session_id
  * @property CarbonImmutable|null $issue_date
  * @property CarbonImmutable|null $due_date
  * @property string $currency
@@ -53,7 +54,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Invoice extends Model
 {
     protected $fillable = [
-        'number', 'channel', 'status', 'customer_id', 'location_id',
+        'number', 'channel', 'status', 'customer_id', 'location_id', 'pos_session_id',
         'issue_date', 'due_date', 'currency', 'prices_include_tax',
         'subtotal', 'discount_total', 'tax_total', 'total', 'amount_paid',
         'notes', 'terms', 'template_key',
@@ -92,6 +93,12 @@ class Invoice extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    /** @return BelongsTo<PosSession, $this> */
+    public function posSession(): BelongsTo
+    {
+        return $this->belongsTo(PosSession::class);
     }
 
     /** @return HasMany<InvoiceItem, $this> */

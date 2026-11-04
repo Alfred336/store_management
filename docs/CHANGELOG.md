@@ -1,5 +1,31 @@
 # Changelog
 
+## [Phase 5] - 2026-11-04
+
+### Added
+
+- **Migration** `add_selling_price_to_products_table`: `selling_price decimal(14,2) NOT NULL DEFAULT 0` with `CHECK >= 0`.
+- **Migration** `create_pos_sessions_table`: `user_id`, `location_id`, `opened_at`, `opening_cash`, `closed_at`, `closing_cash_counted`, `expected_cash`, `difference`, `closed_by`, `notes`, `status` (CHECK `open|closed`). Partial unique index `WHERE status = 'open'` per user.
+- **Migration** `add_pos_session_id_to_invoices_table`: nullable FK `pos_sessions`.
+- **Migration** `add_pos_columns_to_payments_table`: `amount_tendered`, `change_given` (nullable decimal), `pos_session_id` (nullable FK).
+- **Migration** `create_pos_held_sales_table`: `user_id`, `location_id`, `pos_session_id`, `customer_id`, `label`, `cart` (JSON).
+- **Models**: `PosSession` (fillable, casts, `isOpen()`, `user`/`location`/`closer`/`invoices`/`payments`/`heldSales` relationships); `PosHeldSale` (fillable, `cart` JSON cast, relationships). `Product` gains `selling_price` fillable + `decimal:2` cast. `Invoice` gains `pos_session_id` fillable + `posSession()` BelongsTo. `Payment` gains `amount_tendered`, `change_given`, `pos_session_id` fillable/casts + `posSession()` BelongsTo.
+- **`IssueInvoice` change**: Uses `receipt` sequence (RCT-…) for `channel = 'pos'`; `invoice` sequence (INV-…) for all other channels.
+- **`RecordPayment` change**: Passes `amount_tendered`, `change_given`, `pos_session_id` from `$data` to the payment row (nullable — back-office payments unaffected).
+- **`EnsureSystemRoles` change**: Replaces `pos.access` with `pos.use`, `pos.open_session`, `pos.close_session`, `pos.close_any_session`, `pos.discount`, `pos.credit_sale`. Cashier gains all POS permissions except `pos.close_any_session`.
+- **Actions** in `app/Livewire/Actions/Sales/`: `OpenPosSession`, `ClosePosSession`, `CompletePosSale`, `HoldSale`, `ResumeSale`.
+- **Products form/list/details**: `selling_price` field added; used as default `unit_price` when adding a product to an invoice.
+- **POS Livewire screen** (`app/Livewire/Sales/Pos/Index.php`): full-screen layout (no sidebar), product search/barcode, cart with qty/price/discount, customer picker, payment panel (multiple tenders, change display), held sales panel, session open/close panel, receipt panel.
+- **Layout** `resources/views/layouts/pos.blade.php`: minimal full-screen shell without sidebar.
+- **Route**: `GET /pos` → `pos.index` added to the authenticated group.
+- **Sidebar**: "Point of Sale" link added under the Sales group, guarded by `pos.use`.
+- **`PosModuleTest`** (`tests/Feature/Pos/PosModuleTest.php`): 17 tests covering session open/close/duplicate/force-close, sale completion with RCT number and selling_price, change_given, multiple tenders, credit sale permissions, credit limit, insufficient stock, walk-in credit sale block, hold/resume/void held sale, and route authorization.
+
+### Changed
+
+- `Products/Index.php`: Added `sellingPrice` property, `openForm` loads it, `resetForm` clears it, `validatedData` validates and maps it, `selling_price` passed to `CreateProduct`/`UpdateProduct`.
+- `Invoicing/Index.php`: `addLineItem` now seeds `unit_price` from `$product->selling_price` instead of `'0.00'`.
+
 ## [Phase 4] - 2026-11-04
 
 ### Added

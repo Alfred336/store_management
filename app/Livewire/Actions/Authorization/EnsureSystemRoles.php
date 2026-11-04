@@ -33,13 +33,15 @@ class EnsureSystemRoles
             'dashboard.view', 'settings.view', 'settings.update',
             'customers.view', 'customers.create', 'customers.update', 'customers.delete',
             'invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue', 'invoices.void', 'invoices.print',
-            'payments.view', 'payments.create', 'payments.reverse', 'pos.access',
+            'payments.view', 'payments.create', 'payments.reverse',
+            'pos.use', 'pos.open_session', 'pos.close_session', 'pos.close_any_session', 'pos.discount', 'pos.credit_sale',
         ]);
         $cashierPermissions = [
             'dashboard.view', 'products.view', 'categories.view', 'units.view', 'locations.view',
             'customers.view', 'customers.create', 'customers.update',
             'invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue', 'invoices.print',
-            'payments.view', 'payments.create', 'pos.access',
+            'payments.view', 'payments.create',
+            'pos.use', 'pos.open_session', 'pos.close_session', 'pos.discount', 'pos.credit_sale',
         ];
 
         foreach ($allPermissions as $permission) {
