@@ -1,5 +1,31 @@
 # Changelog
 
+## [Phase 4] - 2026-11-04
+
+### Added
+
+- **Migrations**: `create_payments_table` (method/status/amount CHECK constraints, unique idempotency_key) and `create_payment_allocations_table` (unique payment_id+invoice_id, amount > 0 CHECK).
+- **Models**: `Payment` (fillable, decimal:2 cast, BelongsTo customer/receiver/reverser, HasMany allocations, `unallocatedCredit()`, `isActive()`); `PaymentAllocation` (fillable, decimal:2 cast, BelongsTo payment/invoice). `Customer` gains `payments()` HasMany; `Invoice` gains `paymentAllocations()` HasMany.
+- **`PaymentPolicy`** (`app/Policies/PaymentPolicy.php`): `viewAny`/`view` → `payments.view`; `create` → `payments.create`; `reverse` → `payments.reverse`. Registered in `AppServiceProvider`.
+- **Permissions**: `payments.view`, `payments.create`, `payments.reverse` added to `EnsureSystemRoles`. Admin gets all three; Cashier gets view+create; Viewer gets view. Viewer permission count: 6 → 7.
+- **`RecordPayment` action**: Idempotent (returns existing payment on key replay), customer + invoice row locking in ascending id order, allocation validation, `DocumentNumberingService::next('payment')`, invoice status transitions.
+- **`AllocateCredit` action**: Applies unallocated credit from an active payment to open invoices with the same locking pattern.
+- **`ReversePayment` action**: Requires `payments.reverse` + non-empty reason; restores `amount_paid`/status on each allocated invoice; marks payment reversed with audit fields.
+- **`VoidInvoice` guard**: Blocks void when active payment allocations exist — "Reverse the payments first".
+- **`CustomerBalance::outstanding()`**: Now subtracts unallocated credit from active payments (net outstanding = open invoice balances − unallocated credit).
+- **`GetCustomerStatement`**: Removed temporary `Schema::hasTable` guards; uses live `Payment` relationship.
+- **`DeleteCustomer`**: Removed temporary `Schema::hasTable` guards; blocks deletion when customer has invoices **or** payments.
+- **Payments screen** (`app/Livewire/Payments/Index.php`, `resources/views/livewire/payments/`): list with search/filters/totals/sorting/pagination; "Receive payment" form with customer picker, open invoices, auto-allocate; details modal with allocation list, reversal info, inline reverse confirmation.
+- **`PaymentReceiptController`** and two Blade templates (`resources/views/payments/receipt.blade.php`, `resources/views/payments/receipt-thermal.blade.php`): A4 and 80mm thermal receipt PDFs via DomPDF.
+- **Routes**: `GET /payments` (`payments.index`) and `GET /payments/{payment}/receipt` (`payments.receipt`) added to the authenticated group.
+- **Sidebar**: Payments link (banknotes icon) added to the Sales group between Invoices and Customers.
+- **`PaymentModuleTest`** (`tests/Feature/Payments/PaymentModuleTest.php`): 22 tests covering full/partial/multi-invoice payments, overpayment credit, `AllocateCredit`, idempotency, reversal (with/without reason, twice), `VoidInvoice` block, customer balance, credit limit, auth (Cashier/Viewer), Livewire screen, receipt PDF, and validation edge cases.
+
+### Changed
+
+- `CustomerModuleTest`: replaced temporary `TEMPORARY` create block with real `Payment` + `PaymentAllocation` `forceCreate` calls.
+- `InventoryCrudTest`: Viewer permission count assertion updated from 6 → 7.
+
 ## [Phase 3B] - 2026-11-04
 
 ### Added

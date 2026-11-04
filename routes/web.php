@@ -3,11 +3,13 @@
 use App\Http\Controllers\Customers\CustomerExportController;
 use App\Http\Controllers\Customers\CustomerStatementController;
 use App\Http\Controllers\InvoicePdfController;
+use App\Http\Controllers\PaymentReceiptController;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Livewire\Dashboard\Index as DashboardIndex;
 use App\Livewire\Invoicing\Index as InvoicingIndex;
 use App\Livewire\Locations\Index as LocationsIndex;
+use App\Livewire\Payments\Index as PaymentsIndex;
 use App\Livewire\Products\Index as ProductsIndex;
 use App\Livewire\Settings\Index as BusinessSettingsIndex;
 use App\Livewire\Setup\Index as SetupIndex;
@@ -42,7 +44,11 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     // Business settings.
     Route::livewire('business-settings', BusinessSettingsIndex::class)->name('settings.index');
 
-    // Later modules: invoicing, payments, POS, reports, and administration routes are added here.
+    // Payments: list, receive, and receipt.
+    Route::livewire('payments', PaymentsIndex::class)->name('payments.index');
+    Route::get('payments/{payment}/receipt', PaymentReceiptController::class)->name('payments.receipt');
+
+    // Later modules: POS, reports, and administration routes are added here.
 });
 
 require __DIR__.'/settings.php';

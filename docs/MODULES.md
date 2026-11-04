@@ -66,7 +66,23 @@
 - **Routes**: `GET /invoices/{invoice}/pdf` (`invoices.pdf`) and `GET /invoices/{invoice}/documents/{document}` (`invoices.document.download`) under the authenticated group.
 - **Print panel UI**: Template picker, paper picker (filtered by template's supported papers), preview iframe, Print/Download/Save buttons, and a saved-documents table with original/duplicate badges.
 
-## 7. Settings & Document Sequences
+## 7. Payments (Phase 4)
+
+- **Location**: `app/Livewire/Payments/Index.php`, `app/Livewire/Actions/Payments`, `app/Models/Payment.php`, `app/Models/PaymentAllocation.php`, `app/Policies/PaymentPolicy.php`
+- **Actions**:
+  - `RecordPayment`: Idempotent payment recording with optional allocation to open invoices. Locks customer + invoices in ascending id order.
+  - `AllocateCredit`: Applies unallocated credit from an active payment to open invoices.
+  - `ReversePayment`: Reverses an active payment (reason required), restoring invoice balances and statuses.
+- **Screen** (`app/Livewire/Payments/Index.php`): Payment list with ILIKE search, method/status/date/customer filters, sortable columns, filtered totals bar, pagination. "Receive payment" form with customer picker, open invoices with balances, auto-allocate button. Details modal with allocation list, reversal info, and inline reverse confirmation.
+- **Receipt PDF**: `PaymentReceiptController` renders A4 or 80mm thermal receipt via DomPDF; route `GET /payments/{payment}/receipt` (`payments.receipt`).
+- **Permissions**: `payments.view` (Admin, Cashier, Viewer), `payments.create` (Admin, Cashier), `payments.reverse` (Admin only).
+- **Invariants**:
+  - Payments are immutable; use `ReversePayment` to undo.
+  - `VoidInvoice` is blocked while active payment allocations exist on the invoice.
+  - Customer outstanding balance subtracts unallocated credit from active payments.
+  - `DeleteCustomer` is blocked when the customer has any payment records.
+
+## 8. Settings & Document Sequences
 
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:

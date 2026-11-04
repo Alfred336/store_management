@@ -5,7 +5,6 @@ namespace App\Livewire\Actions\Customers;
 use App\Models\Customer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /** Delete an unreferenced customer, preserving records with financial history. */
@@ -26,15 +25,7 @@ class DeleteCustomer
                 throw ValidationException::withMessages(['customer' => 'The Walk-in Customer record cannot be deleted.']);
             }
 
-            if ($locked->invoices()->exists()) {
-                throw ValidationException::withMessages([
-                    'customer' => 'This customer has transaction history. Deactivate the customer instead.',
-                ]);
-            }
-
-            // removed in Phase 4 when payments exist
-            if (Schema::hasTable('payments') && Schema::hasColumn('payments', 'customer_id')
-                && DB::table('payments')->where('customer_id', $locked->id)->exists()) {
+            if ($locked->invoices()->exists() || $locked->payments()->exists()) {
                 throw ValidationException::withMessages([
                     'customer' => 'This customer has transaction history. Deactivate the customer instead.',
                 ]);

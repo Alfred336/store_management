@@ -4,11 +4,10 @@ namespace App\Livewire\Actions\Customers;
 
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Services\Customers\CustomerBalance;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Schema;
 
 /** Build a customer statement without storing a denormalized balance. */
 class GetCustomerStatement
@@ -18,7 +17,7 @@ class GetCustomerStatement
     ) {}
 
     /**
-     * @return array{balance: string, total_spent: string, last_purchase_date: string|null, invoices: Collection<int, array<string, mixed>>, payments: Collection<int, array<array-key, mixed>>}
+     * @return array{balance: string, total_spent: string, last_purchase_date: string|null, invoices: Collection<int, array<string, mixed>>, payments: Collection<int, array{id: int, number: string, amount: string, method: string, reference: string|null, received_at: string, status: string}>}
      */
     public function __invoke(Customer $customer, ?int $limit = 10): array
     {
@@ -61,34 +60,25 @@ class GetCustomerStatement
         return $result;
     }
 
-    /** @return Collection<int, array<array-key, mixed>> */
+    /** @return Collection<int, array{id: int, number: string, amount: string, method: string, reference: string|null, received_at: string, status: string}> */
     private function recentPayments(Customer $customer, ?int $limit): Collection
     {
-        // removed in Phase 4 when payments exist
-        if (! Schema::hasTable('payments') || ! Schema::hasColumn('payments', 'customer_id')
-            || ! Schema::hasColumn('payments', 'amount')) {
-            return collect();
-        }
-
-        $dateColumn = collect(['paid_at', 'payment_date', 'created_at'])
-            ->first(fn (string $column): bool => Schema::hasColumn('payments', $column));
-        $optionalColumns = ['reference', 'method', 'payment_method', 'number'];
-        $columns = array_values(array_filter(
-            ['amount', ...$optionalColumns, ...($dateColumn === null ? [] : [$dateColumn])],
-            fn (string $column): bool => Schema::hasColumn('payments', $column),
-        ));
-        $query = DB::table('payments')->where('customer_id', $customer->id);
-
-        if ($dateColumn !== null) {
-            $query->orderByDesc($dateColumn);
-        }
-
-        $query->orderByDesc('id');
+        $query = $customer->payments()
+            ->orderByDesc('received_at')
+            ->orderByDesc('id');
 
         if ($limit !== null) {
             $query->limit($limit);
         }
 
-        return $query->get($columns)->map(fn (object $payment): array => (array) $payment);
+        return $query->get()->map(fn (Payment $payment): array => [
+            'id' => $payment->id,
+            'number' => $payment->number,
+            'amount' => (string) $payment->amount,
+            'method' => $payment->method,
+            'reference' => $payment->reference,
+            'received_at' => $payment->received_at->format('Y-m-d'),
+            'status' => $payment->status,
+        ]);
     }
 }

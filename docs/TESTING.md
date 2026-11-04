@@ -81,6 +81,40 @@ Run code formatting and style fixes:
 - **Amount in words**: `1,250,000.00 TZS` → "One million two hundred and fifty thousand Shillings Only"; `18,500.50 TZS` → "Eighteen thousand five hundred Shillings and Fifty Cents"; `0.00 TZS` → "Zero Shillings Only".
 - **Fiscal block**: `fiscal` key is `null` when `fiscal_number` is null; returns structured data when fiscal columns are populated.
 
-### 5. Inventory & Stock Suite (`tests/Feature/Inventory/`)
+### 5. Payments Suite (`tests/Feature/Payments/PaymentModuleTest.php`)
+
+- **RecordPayment Action**:
+  - Full payment marks invoice `paid`; partial payment marks it `partially_paid`.
+  - Single payment split across multiple invoices allocates amounts and updates each.
+  - Overpayment against one invoice leaves unallocated credit on the payment.
+  - Allocation exceeding invoice balance is rejected; allocation to draft or another customer's invoice is rejected.
+  - Idempotent replay (same idempotency key) returns the existing payment without re-posting or double-allocating.
+- **AllocateCredit Action**:
+  - Applies unallocated credit from an active payment to a new open invoice.
+- **ReversePayment Action**:
+  - Reversal restores `invoice.amount_paid` and invoice status to their pre-payment values.
+  - Partial-payment reversal returns a `partially_paid` invoice to `issued`.
+  - Reversing an already-reversed payment throws `ValidationException`.
+  - Empty reason string is rejected.
+- **VoidInvoice interaction**:
+  - Voiding is blocked while the invoice has active payment allocations.
+  - Voiding succeeds after the payment is reversed.
+- **Customer Balance**:
+  - `CustomerBalance::outstanding()` reflects unallocated credit from active payments.
+  - Credit limit headroom accounts for net outstanding (open invoices minus unallocated credit).
+- **Authorization**:
+  - Cashier without `payments.reverse` cannot reverse a payment.
+  - Viewer without `payments.create` cannot record a payment.
+  - Unauthenticated request to `payments.index` redirects to login.
+- **Livewire Screen**: List loads; customer-name filter hides other customers; totals bar sums active payments.
+- **Receipt PDF**: Authorized user receives `application/pdf`; user without `payments.view` gets 403.
+- **Validation edge cases**: Zero amount, missing `received_at`, invalid method all throw `ValidationException`.
+
+### 6. Customer Balance Net-Balance Suite (in `CustomerModuleTest.php`)
+
+- Overpayment credit (unallocated portion of an active payment) reduces the net outstanding balance below the open invoice sum.
+- After a payment is reversed its credit contribution is removed: balance returns to the raw invoice sum.
+
+### 7. Inventory & Stock Suite (`tests/Feature/Inventory/`)
 
 - Tests CRUD operations for units, categories, locations, products, batch tracking, transfers, adjustments, and receipts.

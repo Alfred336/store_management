@@ -4,14 +4,19 @@ use App\Enums\InvoiceStatus;
 use App\Exports\CustomersExport;
 use App\Livewire\Actions\Customers\CreateCustomer;
 use App\Livewire\Actions\Customers\DeleteCustomer;
+use App\Livewire\Actions\Customers\GetCustomerStatement;
 use App\Livewire\Actions\Customers\ImportCustomers;
 use App\Livewire\Actions\Customers\UpdateCustomer;
+use App\Livewire\Actions\Payments\ReversePayment;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Location;
+use App\Models\Payment;
+use App\Models\PaymentAllocation;
 use App\Models\User;
 use App\Services\Customers\CreditLimitService;
+use App\Services\Customers\CustomerBalance;
 use App\Services\Settings\Settings;
 use App\Services\Setup\SetupStatus;
 use Database\Seeders\WalkInCustomerSeeder;
@@ -19,7 +24,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
@@ -117,18 +122,8 @@ test('customer list and statement work for a customer with no invoices', functio
 });
 
 test('customer statement reads outstanding invoice balances and recent payment history', function () {
-    // TEMPORARY: the real payments table arrives in Phase 4.
-    if (! Schema::hasTable('payments')) {
-        Schema::create('payments', function ($table): void {
-            $table->id();
-            $table->foreignId('customer_id')->constrained();
-            $table->decimal('amount', 14, 2);
-            $table->string('reference')->nullable();
-            $table->string('method')->nullable();
-            $table->timestamp('paid_at')->nullable();
-            $table->timestamps();
-        });
-    }
+    $payer = customerPermissionsUser(['customers.view', 'payments.create']);
+    $this->actingAs($payer);
 
     $customer = Customer::query()->create([
         'code' => 'TEST-STATEMENT-1',
@@ -137,7 +132,8 @@ test('customer statement reads outstanding invoice balances and recent payment h
     ]);
     $location = Location::forceCreate(['name' => 'Statement Test Store', 'type' => 'store', 'is_active' => true]);
 
-    Invoice::query()->create([
+    // Create an invoice directly (bypassing full issue flow for statement test)
+    $invoice = Invoice::query()->create([
         'number' => 'INV-2026-000001',
         'channel' => 'invoice',
         'status' => InvoiceStatus::PartiallyPaid,
@@ -148,14 +144,25 @@ test('customer statement reads outstanding invoice balances and recent payment h
         'total' => '125.50',
         'amount_paid' => '25.50',
     ]);
-    DB::table('payments')->insert([
+
+    // Create payment and allocation directly — no stock flow needed for statement test
+    $payment = Payment::forceCreate([
+        'number' => 'PAY-2026-000001',
         'customer_id' => $customer->id,
+        'method' => 'cash',
         'amount' => '25.50',
         'reference' => 'PMT-001',
-        'method' => 'cash',
-        'paid_at' => now(),
-        'created_at' => now(),
-        'updated_at' => now(),
+        'received_at' => now(),
+        'received_by' => $payer->id,
+        'status' => 'active',
+        'idempotency_key' => 'TEST-STMT-IDEMP-001',
+    ]);
+
+    // Allocation makes the payment non-credit so outstanding stays 100.00
+    PaymentAllocation::forceCreate([
+        'payment_id' => $payment->id,
+        'invoice_id' => $invoice->id,
+        'amount' => '25.50',
     ]);
 
     $user = customerPermissionsUser(['customers.view']);
@@ -165,6 +172,44 @@ test('customer statement reads outstanding invoice balances and recent payment h
         ->assertSee('INV-2026-000001')
         ->assertSee('PMT-001')
         ->assertSee('25.50');
+});
+
+test('statement data and PDF use received_at not created_at for the payment date', function () {
+    $user = customerPermissionsUser(['customers.view', 'payments.create']);
+    $this->actingAs($user);
+
+    $customer = Customer::query()->create([
+        'code' => 'TEST-RCVDAT-1',
+        'name' => 'Received At Test Customer',
+        'type' => 'business',
+    ]);
+
+    // Payment received on a past date — created_at will be today (now())
+    $pastDate = '2026-03-15';
+    $payment = Payment::forceCreate([
+        'number' => 'PAY-RCVDAT-001',
+        'customer_id' => $customer->id,
+        'method' => 'bank_transfer',
+        'amount' => '500.00',
+        'received_at' => $pastDate,
+        'received_by' => $user->id,
+        'status' => 'active',
+        'idempotency_key' => 'TEST-RCVDAT-IDEMP-001',
+    ]);
+
+    // Statement data has received_at = '2026-03-15', not today
+    $statement = app(GetCustomerStatement::class)($customer, null);
+    $paymentRow = $statement['payments']->first();
+
+    expect($paymentRow['received_at'])->toBe($pastDate)
+        ->and($paymentRow['received_at'])->not->toBe(now()->toDateString());
+
+    // The PDF template HTML contains '2026-03-15' in the payments table
+    app(Settings::class)->put('business.name', 'Test Store');
+    $html = view('pdf.customers.statement', compact('customer', 'statement'))->render();
+    expect($html)->toContain($pastDate)
+        ->and($html)->not->toContain('paid_at')
+        ->and($html)->not->toContain('payment_date');
 });
 
 test('walk-in customer seeding is idempotent and all update/deletion paths are blocked', function () {
@@ -404,6 +449,114 @@ test('credit limit service returns configured warning or block outcomes', functi
 
     app(Settings::class)->put('customers.credit_limit_mode', 'block');
     expect(app(CreditLimitService::class)->evaluate($customer, '125.00')['outcome'])->toBe('block');
+});
+
+test('overpayment credit reduces net outstanding balance', function () {
+    $user = customerPermissionsUser(['customers.view', 'payments.create']);
+    $this->actingAs($user);
+
+    $customer = Customer::query()->create([
+        'code' => 'TEST-NETBAL-1',
+        'name' => 'Net Balance Customer A',
+        'type' => 'business',
+    ]);
+    $location = Location::forceCreate(['name' => 'WH-NB-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT), 'type' => 'warehouse', 'is_active' => true]);
+
+    // Open invoice: total 200, nothing paid yet
+    $invoice = Invoice::forceCreate([
+        'customer_id' => $customer->id,
+        'location_id' => $location->id,
+        'number' => 'INV-NB-001',
+        'status' => InvoiceStatus::Issued,
+        'channel' => 'invoice',
+        'issue_date' => now()->toDateString(),
+        'due_date' => now()->addDays(30)->toDateString(),
+        'subtotal' => '200.00',
+        'discount_total' => '0.00',
+        'tax_total' => '0.00',
+        'total' => '200.00',
+        'amount_paid' => '0.00',
+        'prices_include_tax' => false,
+        'created_by' => $user->id,
+        'issued_by' => $user->id,
+        'issued_at' => now(),
+        'customer_name' => $customer->name,
+    ]);
+
+    // Pay 300 against the 200 invoice → 100 unallocated credit remains
+    $payment = Payment::forceCreate([
+        'number' => 'PAY-NB-001',
+        'customer_id' => $customer->id,
+        'method' => 'cash',
+        'amount' => '300.00',
+        'received_at' => now(),
+        'received_by' => $user->id,
+        'status' => 'active',
+        'idempotency_key' => (string) Str::uuid(),
+    ]);
+
+    PaymentAllocation::forceCreate([
+        'payment_id' => $payment->id,
+        'invoice_id' => $invoice->id,
+        'amount' => '200.00',
+    ]);
+
+    $invoice->update(['amount_paid' => '200.00', 'status' => InvoiceStatus::Paid]);
+
+    // No open invoices; 100 unallocated credit → net outstanding = -100
+    expect(app(CustomerBalance::class)->outstanding($customer))->toBe('-100.00');
+});
+
+test('reversed payment no longer reduces customer net outstanding balance', function () {
+    $user = customerPermissionsUser(['customers.view', 'payments.create', 'payments.reverse']);
+    $this->actingAs($user);
+
+    $customer = Customer::query()->create([
+        'code' => 'TEST-NETBAL-2',
+        'name' => 'Net Balance Customer B',
+        'type' => 'business',
+    ]);
+    $location = Location::forceCreate(['name' => 'WH-NB2-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT), 'type' => 'warehouse', 'is_active' => true]);
+
+    // Open invoice: total 500, nothing paid
+    Invoice::forceCreate([
+        'customer_id' => $customer->id,
+        'location_id' => $location->id,
+        'number' => 'INV-NB-002',
+        'status' => InvoiceStatus::Issued,
+        'channel' => 'invoice',
+        'issue_date' => now()->toDateString(),
+        'due_date' => now()->addDays(30)->toDateString(),
+        'subtotal' => '500.00',
+        'discount_total' => '0.00',
+        'tax_total' => '0.00',
+        'total' => '500.00',
+        'amount_paid' => '0.00',
+        'prices_include_tax' => false,
+        'created_by' => $user->id,
+        'issued_by' => $user->id,
+        'issued_at' => now(),
+        'customer_name' => $customer->name,
+    ]);
+
+    // Unallocated payment of 200 → reduces net balance from 500 to 300
+    $payment = Payment::forceCreate([
+        'number' => 'PAY-NB-002',
+        'customer_id' => $customer->id,
+        'method' => 'cash',
+        'amount' => '200.00',
+        'received_at' => now(),
+        'received_by' => $user->id,
+        'status' => 'active',
+        'idempotency_key' => (string) Str::uuid(),
+    ]);
+
+    expect(app(CustomerBalance::class)->outstanding($customer))->toBe('300.00');
+
+    // After reversal the 200 credit vanishes → balance is back to 500
+    app(ReversePayment::class)($payment, 'Error in payment');
+
+    expect(app(CustomerBalance::class)->outstanding($customer))->toBe('500.00');
 });
 
 test('customers are forbidden without view permission and create permission is enforced', function () {

@@ -21,7 +21,7 @@ class AdminUserSeeder extends Seeder
         }
 
         $admin = User::query()->updateOrCreate(
-            ['email' => 'admin@example.com'],
+            ['email' => 'admin@sealtech.com'],
             [
                 'name' => 'Admin',
                 'password' => $password,

@@ -20,7 +20,7 @@
             <section class="space-y-2">
                 <flux:heading>Recent invoices</flux:heading>
                 @forelse ($statement['invoices'] as $invoice)
-                    <div class="flex justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-800"><span>{{ $invoice['number'] ?? 'Invoice' }} · {{ $invoice['issue_date'] ?? $invoice['created_at'] ?? '—' }}</span><span>{{ $invoice['total'] ?? '0.00' }} · {{ $invoice['status'] ?? '—' }}</span></div>
+                    <div class="flex justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-800"><span>{{ $invoice['number'] ?? '—' }} · {{ $invoice['issue_date'] ?? '—' }}</span><span>{{ $invoice['total'] }} · {{ $invoice['status'] }}</span></div>
                 @empty
                     <p class="text-sm text-zinc-500">No invoices yet.</p>
                 @endforelse
@@ -29,7 +29,7 @@
             <section class="space-y-2">
                 <flux:heading>Recent payments</flux:heading>
                 @forelse ($statement['payments'] as $payment)
-                    <div class="flex justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-800"><span>{{ $payment['number'] ?? $payment['reference'] ?? 'Payment' }} · {{ $payment['paid_at'] ?? $payment['payment_date'] ?? $payment['created_at'] ?? '—' }}</span><span>{{ $payment['amount'] ?? '0.00' }} · {{ $payment['method'] ?? $payment['payment_method'] ?? '—' }}</span></div>
+                    <div class="flex justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-800"><span>{{ $payment['number'] }}@if(!empty($payment['reference'])) · {{ $payment['reference'] }}@endif · {{ $payment['received_at'] }}</span><span>{{ $payment['amount'] }} · {{ $payment['method'] }}</span></div>
                 @empty
                     <p class="text-sm text-zinc-500">No payments yet.</p>
                 @endforelse

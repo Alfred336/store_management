@@ -72,7 +72,7 @@ class InvoiceDocumentData
             'channel' => $invoice->channel,
             'status' => $invoice->status->label(),
             'status_value' => $invoice->status->value,
-            'location' => $invoice->location?->name ?? '',
+            'location' => $invoice->location->name,
             'issue_date' => $invoice->issue_date?->format('d M Y') ?? '',
             'due_date' => $invoice->due_date?->format('d M Y') ?? '',
             'issued_at' => $invoice->issued_at?->format('d M Y H:i') ?? '',
@@ -104,11 +104,11 @@ class InvoiceDocumentData
         $c = $invoice->customer;
 
         return [
-            'name' => $c?->name ?? '',
-            'phone' => $c?->phone ?? '',
-            'address' => $c?->address ?? '',
-            'tin' => $c?->tin ?? '',
-            'vrn' => $c?->vrn ?? '',
+            'name' => $c->name ?? '',
+            'phone' => $c->phone ?? '',
+            'address' => $c->address ?? '',
+            'tin' => $c->tin ?? '',
+            'vrn' => $c->vrn ?? '',
         ];
     }
 
@@ -133,7 +133,7 @@ class InvoiceDocumentData
                 'description' => $item->description,
                 'sku' => $item->sku ?? '',
                 'quantity' => rtrim(rtrim((string) $item->quantity, '0'), '.'),
-                'unit' => $item->unit?->abbreviation ?? '',
+                'unit' => $item->unit->abbreviation,
                 'unit_price' => number_format((float) $item->unit_price, 2),
                 'discount' => number_format((float) $item->discount_amount, 2),
                 'tax_rate' => number_format((float) $item->tax_rate, 2),
@@ -182,8 +182,8 @@ class InvoiceDocumentData
     public function amountInWords(string $amount, string $currency = 'TZS'): string
     {
         $parts = explode('.', number_format((float) $amount, 2, '.', ''));
-        $whole = (int) ($parts[0] ?? 0);
-        $cents = (int) ($parts[1] ?? 0);
+        $whole = (int) $parts[0];
+        $cents = (int) $parts[1];
 
         $wholeWords = $this->intToWords($whole);
 
@@ -209,7 +209,7 @@ class InvoiceDocumentData
 
     private function intToWords(int $n): string
     {
-        if ($n === 0) {
+        if ($n <= 0) {
             return 'zero';
         }
 

@@ -22,7 +22,10 @@ enum InvoiceTemplate: string
         };
     }
 
-    /** Paper sizes this template supports. */
+    /** Paper sizes this template supports.
+     *
+     * @return list<string>
+     */
     public function supportedPapers(): array
     {
         return match ($this) {
@@ -46,7 +49,10 @@ enum InvoiceTemplate: string
         return $this === self::Thermal;
     }
 
-    /** All paper sizes across every template (for validation). */
+    /** All paper sizes across every template (for validation).
+     *
+     * @return list<string>
+     */
     public static function allPapers(): array
     {
         return ['A4', 'A5', '80mm', '58mm'];

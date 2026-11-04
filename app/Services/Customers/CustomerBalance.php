@@ -22,33 +22,61 @@ class CustomerBalance
     ) {}
 
     /**
-     * Return the outstanding balance (total − amount_paid) for posted invoices.
+     * Return the net outstanding balance:
+     *   sum(invoice.total - invoice.amount_paid) for open invoices (issued, partially_paid)
+     *   minus unallocated credit from active payments.
+     *
+     * The result may be negative when the customer has pre-paid more than they owe.
      *
      * @return numeric-string
      */
     public function outstanding(Customer $customer): string
     {
-        $postedStatuses = [
-            InvoiceStatus::Issued,
-            InvoiceStatus::PartiallyPaid,
-            InvoiceStatus::Paid,
-        ];
+        $openStatuses = [InvoiceStatus::Issued, InvoiceStatus::PartiallyPaid];
 
         $rows = $customer->invoices()
-            ->whereIn('status', $postedStatuses)
+            ->whereIn('status', $openStatuses)
             ->get(['total', 'amount_paid']);
 
         $balance = '0.00';
-
         foreach ($rows as $invoice) {
-            $outstanding = $this->money->sub(
-                (string) $invoice->total,
-                (string) $invoice->amount_paid,
+            $balance = $this->money->add(
+                $balance,
+                $this->money->sub((string) $invoice->total, (string) $invoice->amount_paid),
             );
-            $balance = $this->money->add($balance, $outstanding);
+        }
+
+        // Subtract unallocated credit from active payments
+        $unallocated = $this->unallocatedCredit($customer);
+        if ($this->money->compare($unallocated, '0.00') > 0) {
+            $balance = $this->money->sub($balance, $unallocated);
         }
 
         return $balance;
+    }
+
+    /**
+     * Sum of unallocated credit across all active payments for this customer.
+     *
+     * @return numeric-string
+     */
+    public function unallocatedCredit(Customer $customer): string
+    {
+        $payments = $customer->payments()
+            ->where('status', 'active')
+            ->withSum('allocations', 'amount')
+            ->get(['id', 'amount']);
+
+        $credit = '0.00';
+        foreach ($payments as $payment) {
+            $allocated = number_format((float) ($payment->allocations_sum_amount ?? 0), 2, '.', '');
+            $remaining = $this->money->sub((string) $payment->amount, $allocated);
+            if ($this->money->compare($remaining, '0.00') > 0) {
+                $credit = $this->money->add($credit, $remaining);
+            }
+        }
+
+        return $credit;
     }
 
     /**
@@ -69,17 +97,11 @@ class CustomerBalance
             ->whereIn('status', $postedStatuses)
             ->get(['total', 'amount_paid', 'issue_date']);
 
-        $balance = '0.00';
         $totalSpent = '0.00';
         $lastPurchaseDate = null;
 
         foreach ($rows as $invoice) {
             $totalSpent = $this->money->add($totalSpent, (string) $invoice->total);
-            $outstanding = $this->money->sub(
-                (string) $invoice->total,
-                (string) $invoice->amount_paid,
-            );
-            $balance = $this->money->add($balance, $outstanding);
 
             $dateValue = $invoice->issue_date?->format('Y-m-d');
             if ($dateValue !== null && ($lastPurchaseDate === null || $dateValue > $lastPurchaseDate)) {
@@ -88,7 +110,7 @@ class CustomerBalance
         }
 
         return [
-            'balance' => $balance,
+            'balance' => $this->outstanding($customer),
             'total_spent' => $totalSpent,
             'last_purchase_date' => $lastPurchaseDate,
         ];

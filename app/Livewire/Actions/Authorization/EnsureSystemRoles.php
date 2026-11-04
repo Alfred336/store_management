@@ -33,7 +33,7 @@ class EnsureSystemRoles
             'dashboard.view', 'settings.view', 'settings.update',
             'customers.view', 'customers.create', 'customers.update', 'customers.delete',
             'invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue', 'invoices.void', 'invoices.print',
-            'payments.view', 'payments.create', 'payments.void', 'pos.access',
+            'payments.view', 'payments.create', 'payments.reverse', 'pos.access',
         ]);
         $cashierPermissions = [
             'dashboard.view', 'products.view', 'categories.view', 'units.view', 'locations.view',
@@ -50,7 +50,7 @@ class EnsureSystemRoles
             'Admin' => $allPermissions,
             'Storekeeper' => array_merge($managePermissions, ['dashboard.view', 'invoices.view', 'invoices.print']),
             'Cashier' => $cashierPermissions,
-            'Viewer' => array_merge($viewPermissions, ['dashboard.view', 'invoices.view']),
+            'Viewer' => array_merge($viewPermissions, ['dashboard.view', 'invoices.view', 'payments.view']),
         ];
 
         foreach ($roles as $name => $permissions) {

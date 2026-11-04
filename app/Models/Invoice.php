@@ -124,6 +124,12 @@ class Invoice extends Model
         return $this->hasMany(InvoiceDocument::class);
     }
 
+    /** @return HasMany<PaymentAllocation, $this> */
+    public function paymentAllocations(): HasMany
+    {
+        return $this->hasMany(PaymentAllocation::class);
+    }
+
     /**
      * Amount still owed. Computed from stored values with bcmath, never stored.
      *

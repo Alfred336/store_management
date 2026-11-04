@@ -44,6 +44,12 @@ class VoidInvoice
                 ]);
             }
 
+            if ($locked->paymentAllocations()->whereHas('payment', fn ($q) => $q->where('status', 'active'))->exists()) {
+                throw ValidationException::withMessages([
+                    'invoice' => 'Reverse the payments first before voiding this invoice.',
+                ]);
+            }
+
             if (bccomp((string) $locked->amount_paid, '0.00', 2) > 0) {
                 throw ValidationException::withMessages([
                     'invoice' => 'Payments must be reversed before voiding this invoice.',

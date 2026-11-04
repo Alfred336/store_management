@@ -40,6 +40,40 @@ If insufficient stock or any validation fails, the entire transaction rolls back
 - Records audit fields (`voided_by`, `voided_at`, `void_reason`).
 - Ledger invariant holds: sum of stock movements equals stock levels before issue, after issue, and after void.
 
+## Payments Lifecycle (Phase 4)
+
+### Recording a payment
+
+`RecordPayment(array $data, string $idempotencyKey)` executes in a single transaction:
+
+1. Checks idempotency: returns the existing payment unchanged if the key was used before.
+2. Locks the customer row (must be active).
+3. Locks invoice rows in ascending `id` order to prevent deadlocks.
+4. Validates each allocation: invoice must belong to the customer, be in `issued` or `partially_paid` status, and the allocated amount must not exceed its current balance.
+5. Allocates a sequential `PAY-` document number via `DocumentNumberingService::next('payment')`.
+6. Creates the `Payment` record and one `PaymentAllocation` row per invoice.
+7. Updates each invoice's `amount_paid`; sets status to `paid` when fully settled, `partially_paid` otherwise.
+8. Any payment amount not allocated to invoices remains as unallocated customer credit (not stored — computed live).
+
+### Allocating credit
+
+`AllocateCredit(Payment $payment, array $allocations)` applies unallocated credit from an existing active payment to open invoices. Same locking and validation pattern as `RecordPayment`. Requires `payments.create` permission.
+
+### Reversing a payment
+
+`ReversePayment(Payment $payment, string $reason)` requires `payments.reverse` permission and a non-empty reason:
+
+1. Locks the payment row; rejects if already `reversed`.
+2. Locks affected invoice rows in ascending `id` order.
+3. For each allocation: subtracts the allocated amount from `invoice.amount_paid`; resets status to `issued` (if paid reaches 0) or `partially_paid`.
+4. Marks the payment `reversed` with `reversed_by`, `reversed_at`, `reverse_reason`. Allocations are retained as the audit trail.
+
+### Customer balance and credit limit
+
+`CustomerBalance::outstanding()` = sum of open invoice balances (issued + partially\_paid) **minus** unallocated credit from active payments. The result may be negative when a customer has pre-paid more than they owe; this is correct — negative outstanding extends headroom against their credit limit.
+
+`VoidInvoice` is blocked (`ValidationException`) when any active payment allocation exists against the invoice. Reverse all relevant payments before voiding.
+
 ## Customer statements
 
 Customer balances are calculated at read time from issued, partially paid, and paid invoices (`total − amount_paid`); draft and void invoices are excluded. The in-app details panel lists recent invoices and payments, while the downloadable PDF statement renders full history.

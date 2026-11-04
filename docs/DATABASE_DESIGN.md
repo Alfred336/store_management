@@ -50,6 +50,28 @@ The schema contains the Laravel/auth tables, Spatie Permission tables, inventory
 - Populated by a `FiscalProvider` integration; the default `NullFiscalProvider` reads and returns them as-is.
 - Invoice PDF templates show the fiscal block only when `fiscal_number` is non-null.
 
+## Payments Schema (Phase 4)
+
+### `payments`
+
+- Records a single customer cash/mobile-money/bank/cheque/card receipt. Immutable after creation; use `ReversePayment` to undo.
+- `method CHECK (method IN ('cash', 'mobile_money', 'bank_transfer', 'cheque', 'card'))`.
+- `status CHECK (status IN ('active', 'reversed'))`, default `active`.
+- `amount CHECK (amount > 0)`, stored as `numeric(14,2)`.
+- `received_at` (timestamp): when the funds were physically received.
+- `received_by` FK → `users` with `restrictOnDelete`; `customer_id` FK → `customers` with `restrictOnDelete`.
+- Reversal audit: nullable `reversed_by` FK → `users` with `nullOnDelete`, `reversed_at`, `reverse_reason`.
+- Idempotency enforced with a unique `idempotency_key` constraint.
+- Unique index on `number`.
+
+### `payment_allocations`
+
+- Maps a payment to the invoice(s) it partially or fully pays.
+- `payment_id` FK → `payments` with `restrictOnDelete`; `invoice_id` FK → `invoices` with `restrictOnDelete`.
+- Unique constraint `(payment_id, invoice_id)` prevents double-allocation.
+- `amount CHECK (amount > 0)`, stored as `numeric(14,2)`.
+- Allocations are kept permanently even after reversal — they form the audit trail.
+
 ## Settings and document numbering
 
 - `settings` is a key/value table. Values are JSON-encoded text so booleans and numeric settings retain scalar types; all company profile, VAT, currency and numbering preferences live here.
