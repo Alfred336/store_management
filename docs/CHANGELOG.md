@@ -1,6 +1,6 @@
 # Changelog
 
-## [Phase 6] - 2026-11-05
+## [Inventory screens] - 2026-11-05
 
 ### Added
 

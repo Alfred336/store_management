@@ -8,7 +8,8 @@
                 <flux:table.column>Location</flux:table.column>
                 <flux:table.column>Batch</flux:table.column>
                 <flux:table.column>Quantity</flux:table.column>
-                <flux:table.column>Reference / Reason</flux:table.column>
+                <flux:table.column>Reference</flux:table.column>
+                <flux:table.column>Reason</flux:table.column>
                 <flux:table.column>User</flux:table.column>
             </flux:table.columns>
             <flux:table.rows>
@@ -59,15 +60,16 @@
                             <span class="text-xs text-zinc-500">{{ $m->product->baseUnit->abbreviation }}</span>
                         </flux:table.cell>
                         <flux:table.cell>
-                            <div class="max-w-[14rem] truncate text-sm">
-                                {{ $m->reference ?? $m->notes ?? '—' }}
-                            </div>
+                            <div class="max-w-[12rem] truncate text-sm font-mono">{{ $m->reference ?? '—' }}</div>
+                        </flux:table.cell>
+                        <flux:table.cell>
+                            <div class="max-w-[14rem] truncate text-sm">{{ $m->reason ?? '—' }}</div>
                         </flux:table.cell>
                         <flux:table.cell class="text-sm">{{ $m->user?->name ?? '—' }}</flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="8" class="py-10 text-center text-zinc-400">No movements found.</flux:table.cell>
+                        <flux:table.cell colspan="9" class="py-10 text-center text-zinc-400">No movements found.</flux:table.cell>
                     </flux:table.row>
                 @endforelse
             </flux:table.rows>

@@ -100,7 +100,7 @@
   - Held sales never touch stock or document sequences.
   - Tenders sum must ≥ invoice total for cash sales; credit sales require the named customer to be within credit limit.
 
-## 9. Inventory Operations Screens (Phase 6)
+## 9. Inventory Operations Screens
 
 - **Location**: `app/Livewire/Inventory/Index.php`, `app/Livewire/Inventory/Ledger/Index.php`, `app/Livewire/Actions/Inventory/`
 - **Screens**:

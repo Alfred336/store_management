@@ -4,7 +4,7 @@
         <flux:subheading>Live inventory overview.</flux:subheading>
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <article class="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:text>Active products</flux:text>
             <p class="mt-3 text-3xl font-semibold">{{ number_format($activeProducts) }}</p>
@@ -12,6 +12,10 @@
         <article class="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:text>Low-stock products</flux:text>
             <p class="mt-3 text-3xl font-semibold {{ $lowStockProducts > 0 ? 'text-amber-600 dark:text-amber-400' : '' }}">{{ number_format($lowStockProducts) }}</p>
+        </article>
+        <article class="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+            <flux:text>Out-of-stock products</flux:text>
+            <p class="mt-3 text-3xl font-semibold {{ $outOfStockProducts > 0 ? 'text-red-600 dark:text-red-400' : '' }}">{{ number_format($outOfStockProducts) }}</p>
         </article>
         <article class="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:text>Active locations</flux:text>

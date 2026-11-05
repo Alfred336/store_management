@@ -74,7 +74,7 @@ If insufficient stock or any validation fails, the entire transaction rolls back
 
 `VoidInvoice` is blocked (`ValidationException`) when any active payment allocation exists against the invoice. Reverse all relevant payments before voiding.
 
-## Inventory Operations (Phase 6)
+## Inventory Operations
 
 ### Receive
 

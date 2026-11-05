@@ -525,3 +525,122 @@ test('stock movement total equals stock level (ledger invariant)', function () {
 
     expect(bccomp((string) $movementSum, (string) $levelQty, 3))->toBe(0);
 });
+
+test('ledger invariant holds after receive adjust and transfer', function () {
+    $product = makeProduct();
+    $from = Location::factory()->create();
+    $to = Location::factory()->create();
+    $service = app(StockService::class);
+
+    $service->receive(['product_id' => $product->id, 'location_id' => $from->id, 'quantity' => '20.000']);
+    $service->adjust(['product_id' => $product->id, 'location_id' => $from->id, 'quantity' => '-2.000', 'reason' => 'Shrinkage']);
+    $service->transfer(['product_id' => $product->id, 'from_location_id' => $from->id, 'to_location_id' => $to->id, 'quantity' => '5.000']);
+
+    // Source: receipt(+20) + adjustment(-2) + transfer_out(-5) = 13
+    $fromSum = (string) StockMovement::query()
+        ->where('product_id', $product->id)
+        ->where('location_id', $from->id)
+        ->sum('quantity');
+    $fromLevel = StockLevel::query()
+        ->where('product_id', $product->id)
+        ->where('location_id', $from->id)
+        ->value('quantity');
+    expect(bccomp($fromSum, (string) $fromLevel, 3))->toBe(0);
+
+    // Destination: transfer_in(+5) = 5
+    $toSum = (string) StockMovement::query()
+        ->where('product_id', $product->id)
+        ->where('location_id', $to->id)
+        ->sum('quantity');
+    $toLevel = StockLevel::query()
+        ->where('product_id', $product->id)
+        ->where('location_id', $to->id)
+        ->value('quantity');
+    expect(bccomp($toSum, (string) $toLevel, 3))->toBe(0);
+});
+
+test('adjustment reason is stored in movement and visible in ledger', function () {
+    $keeper = inventoryUser(['inventory.view', 'inventory.adjust']);
+    $product = makeProduct();
+    $location = Location::factory()->create();
+
+    app(StockService::class)->receive(['product_id' => $product->id, 'location_id' => $location->id, 'quantity' => '10.000']);
+
+    Livewire::actingAs($keeper)->test(InventoryIndex::class)
+        ->call('openAdjust', $product->id, (string) $location->id)
+        ->set('adjustQuantity', '-2.000')
+        ->set('adjustReason', 'Found damaged in storage')
+        ->call('adjust')
+        ->assertHasNoErrors();
+
+    $movement = StockMovement::query()
+        ->where('product_id', $product->id)
+        ->where('type', 'adjustment')
+        ->first();
+
+    expect($movement->reason)->toBe('Found damaged in storage');
+
+    $viewer = inventoryUser(['inventory.view']);
+    Livewire::actingAs($viewer)->test(InventoryLedger::class)
+        ->assertSee('Found damaged in storage');
+});
+
+test('storekeeper can call receive adjust and transfer actions', function () {
+    $keeper = inventoryUser(['inventory.view', 'inventory.receive', 'inventory.adjust', 'inventory.transfer']);
+    $product = makeProduct();
+    $from = Location::factory()->create();
+    $to = Location::factory()->create();
+
+    Livewire::actingAs($keeper)->test(InventoryIndex::class)
+        ->call('openReceive', $product->id, (string) $from->id)
+        ->set('receiveQuantity', '20.000')
+        ->call('receive')
+        ->assertHasNoErrors();
+
+    Livewire::actingAs($keeper)->test(InventoryIndex::class)
+        ->call('openAdjust', $product->id, (string) $from->id)
+        ->set('adjustQuantity', '-2.000')
+        ->set('adjustReason', 'Damage')
+        ->call('adjust')
+        ->assertHasNoErrors();
+
+    Livewire::actingAs($keeper)->test(InventoryIndex::class)
+        ->call('openTransfer', $product->id, (string) $from->id)
+        ->set('transferFromLocationId', (string) $from->id)
+        ->set('transferToLocationId', (string) $to->id)
+        ->set('transferQuantity', '5.000')
+        ->call('transfer')
+        ->assertHasNoErrors();
+});
+
+test('viewer cannot call receive adjust transfer actions directly', function () {
+    $viewer = inventoryUser(['inventory.view']);
+
+    Livewire::actingAs($viewer)->test(InventoryIndex::class)
+        ->call('receive')
+        ->assertStatus(403);
+
+    Livewire::actingAs($viewer)->test(InventoryIndex::class)
+        ->call('adjust')
+        ->assertStatus(403);
+
+    Livewire::actingAs($viewer)->test(InventoryIndex::class)
+        ->call('transfer')
+        ->assertStatus(403);
+});
+
+test('cashier cannot call receive adjust transfer actions directly', function () {
+    $cashier = inventoryUser(['inventory.view']);
+
+    Livewire::actingAs($cashier)->test(InventoryIndex::class)
+        ->call('receive')
+        ->assertStatus(403);
+
+    Livewire::actingAs($cashier)->test(InventoryIndex::class)
+        ->call('adjust')
+        ->assertStatus(403);
+
+    Livewire::actingAs($cashier)->test(InventoryIndex::class)
+        ->call('transfer')
+        ->assertStatus(403);
+});

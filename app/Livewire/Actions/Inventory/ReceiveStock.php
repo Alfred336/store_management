@@ -32,7 +32,7 @@ class ReceiveStock
      *   batch_expiry?: string|null,
      *   reference?: string|null,
      *   person_name?: string|null,
-     *   notes?: string|null,
+     *   reason?: string|null,
      * }  $data
      */
     public function __invoke(array $data): StockMovement
@@ -55,7 +55,7 @@ class ReceiveStock
                 'batch_id' => $batchId,
                 'reference' => $data['reference'] ?? null,
                 'person_name' => $data['person_name'] ?? null,
-                'reason' => $data['notes'] ?? null,
+                'reason' => $data['reason'] ?? null,
             ]);
         });
     }

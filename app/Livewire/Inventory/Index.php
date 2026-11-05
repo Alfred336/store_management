@@ -188,7 +188,7 @@ class Index extends Component
                 'batch_expiry' => $batchExpiry,
                 'reference' => $this->receiveReference !== '' ? $this->receiveReference : null,
                 'person_name' => $this->receivePersonName !== '' ? $this->receivePersonName : null,
-                'notes' => $this->receiveNotes !== '' ? $this->receiveNotes : null,
+                'reason' => $this->receiveNotes !== '' ? $this->receiveNotes : null,
             ]);
 
             $this->dispatch('close-modal', name: 'receive-form');
@@ -413,13 +413,11 @@ class Index extends Component
             })
             ->when($this->locationFilter !== '', fn (Builder $q) => $q->where('stock_levels.location_id', (int) $this->locationFilter))
             ->when($this->categoryFilter !== '', fn (Builder $q) => $q->where('products.category_id', (int) $this->categoryFilter))
-            ->when($this->outOfStockOnly, fn (Builder $q) => $q->whereRaw(
-                '(SELECT COALESCE(SUM(sl2.quantity), 0) FROM stock_levels sl2 WHERE sl2.product_id = products.id) = 0'
-            ))
+            ->when($this->outOfStockOnly, fn (Builder $q) => $q
+                ->whereIn('stock_levels.product_id', Product::outOfStock()->select('id'))
+            )
             ->when($this->lowStockOnly, fn (Builder $q) => $q
-                ->whereRaw('(SELECT COALESCE(SUM(sl2.quantity), 0) FROM stock_levels sl2 WHERE sl2.product_id = products.id) > 0')
-                ->whereRaw('products.reorder_level > 0')
-                ->whereRaw('(SELECT COALESCE(SUM(sl2.quantity), 0) FROM stock_levels sl2 WHERE sl2.product_id = products.id) <= products.reorder_level')
+                ->whereIn('stock_levels.product_id', Product::lowStock()->select('id'))
             )
             ->when($this->expiringDays > 0, fn (Builder $q) => $q
                 ->whereNotNull('stock_levels.batch_id')

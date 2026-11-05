@@ -281,6 +281,11 @@ class Index extends Component
             ->lowStock()
             ->pluck('id');
 
+        $outOfStockIds = Product::query()
+            ->whereKey($products->getCollection()->modelKeys())
+            ->outOfStock()
+            ->pluck('id');
+
         $selected = $this->showDetails && $this->productId !== null
             ? Product::query()
                 ->with(['category', 'baseUnit', 'productUnits.unit'])
@@ -306,7 +311,7 @@ class Index extends Component
 
         $hasMovements = $editingProduct?->stockMovements()->exists() ?? false;
 
-        return view('livewire.products.index', compact('products', 'lowStockIds', 'selected', 'categories', 'units', 'editingProduct', 'hasMovements'));
+        return view('livewire.products.index', compact('products', 'lowStockIds', 'outOfStockIds', 'selected', 'categories', 'units', 'editingProduct', 'hasMovements'));
     }
 
     /**

@@ -25,6 +25,7 @@ class Index extends Component
         return view('livewire.dashboard.index', [
             'activeProducts' => Product::query()->where('is_active', true)->count(),
             'lowStockProducts' => Product::query()->where('is_active', true)->lowStock()->count(),
+            'outOfStockProducts' => Product::query()->where('is_active', true)->outOfStock()->count(),
             'activeLocations' => Location::query()->where('is_active', true)->count(),
             'movementsToday' => StockMovement::query()->whereDate('moved_at', today())->count(),
         ]);

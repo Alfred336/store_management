@@ -93,7 +93,7 @@
             <flux:input wire:model="receiveReference" label="Reference" placeholder="PO or delivery number" />
             <flux:input wire:model="receivePersonName" label="Received from" placeholder="Supplier or person name" />
         </div>
-        <flux:textarea wire:model="receiveNotes" label="Notes" rows="2" placeholder="Optional notes…" />
+        <flux:textarea wire:model="receiveNotes" label="Notes / reason" rows="2" placeholder="e.g. Supplier delivery note…" />
 
         <div class="flex justify-end gap-3 border-t border-zinc-200 pt-5 dark:border-zinc-700">
             <flux:button type="button" variant="ghost" x-on:click="$flux.modal('receive-form').close()">Cancel</flux:button>
