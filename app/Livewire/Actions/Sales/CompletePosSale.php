@@ -112,8 +112,41 @@ class CompletePosSale
                     throw ValidationException::withMessages(["items.{$index}.quantity" => 'Quantity must be positive.']);
                 }
 
-                $unitPrice = $this->money->decimal($item['unit_price']);
+                // Unit price is always taken from the database.
+                // For packaging units (e.g. carton), the price per unit = selling_price × factor.
+                $unitPrice = $this->money->decimal((string) $product->selling_price);
+                if ($unitId !== (int) $product->base_unit_id) {
+                    $factor = $product->productUnits()
+                        ->where('unit_id', $unitId)
+                        ->value('factor');
+                    if ($factor !== null) {
+                        $unitPrice = $this->money->mul($unitPrice, (string) $factor);
+                    }
+                }
+
                 $discount = $this->money->round((string) ($item['discount_amount'] ?? '0.00'));
+
+                // Discount guards: permission required; optional hard cap from settings.
+                if (bccomp($discount, '0', 2) > 0) {
+                    if (! auth()->user()?->can('pos.discount')) {
+                        throw ValidationException::withMessages([
+                            "items.{$index}.discount_amount" => 'You are not allowed to give discounts.',
+                        ]);
+                    }
+
+                    $maxPct = $this->settings->get('pos.max_discount_percent', null);
+                    if ($maxPct !== null) {
+                        // Line value from DB only: unit_price (includes factor) × quantity
+                        $lineValue = bcmul($unitPrice, $quantity, 4);
+                        $maxDiscount = $this->money->percent($lineValue, $this->money->decimal((string) $maxPct));
+                        if (bccomp($discount, $maxDiscount, 2) > 0) {
+                            throw ValidationException::withMessages([
+                                "items.{$index}.discount_amount" => "Discount exceeds the maximum allowed ({$maxPct}%).",
+                            ]);
+                        }
+                    }
+                }
+
                 $baseQuantity = $this->stockService->convertToBase($product, $unitId, $quantity);
                 $taxType = $product->tax_type ?? 'standard';
                 $taxRate = $taxType === 'standard' ? $vatRate : '0.00';

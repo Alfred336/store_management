@@ -1,7 +1,10 @@
 <?php
 
+use App\Enums\InvoiceStatus;
 use App\Exceptions\InsufficientStockException;
 use App\Livewire\Actions\Customers\EnsureWalkInCustomer;
+use App\Livewire\Actions\Invoicing\VoidInvoice;
+use App\Livewire\Actions\Payments\ReversePayment;
 use App\Livewire\Actions\Sales\ClosePosSession;
 use App\Livewire\Actions\Sales\CompletePosSale;
 use App\Livewire\Actions\Sales\HoldSale;
@@ -9,14 +12,17 @@ use App\Livewire\Actions\Sales\OpenPosSession;
 use App\Livewire\Actions\Sales\ResumeSale;
 use App\Livewire\Sales\Pos\Index as PosIndex;
 use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\Location;
 use App\Models\Payment;
+use App\Models\PaymentAllocation;
 use App\Models\PosHeldSale;
 use App\Models\PosSession;
 use App\Models\Product;
 use App\Models\StockLevel;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Settings\Settings;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -29,7 +35,7 @@ function posUser(array $extra = []): User
 {
     $base = [
         'pos.use', 'pos.open_session', 'pos.close_session',
-        'invoices.issue', 'invoices.create', 'payments.create',
+        'invoices.issue', 'invoices.create', 'payments.view', 'payments.create',
     ];
 
     $user = User::factory()->create(['name' => 'POS Cashier']);
@@ -186,7 +192,7 @@ test('closing_a_session_computes_expected_cash_and_difference', function (): voi
 
 // ─── 4. Manager closes another user's session ─────────────────────────────────
 
-test('manager_can_force_close_another_user_session', function (): void {
+test('user_with_close_any_session_can_force_close_another_users_session', function (): void {
     $cashier = posUser();
     $manager = posAdminUser();
     $location = posLocation();
@@ -480,4 +486,299 @@ test('close_session_requires_at_least_one_permission', function (): void {
     expect(fn () => app(ClosePosSession::class)($session, [
         'closing_cash_counted' => '500.00',
     ]))->toThrow(HttpException::class);
+});
+
+// ─── 18. Tampered price is ignored — server uses DB selling_price ──────────────
+
+test('tampered_unit_price_is_ignored_server_uses_db_selling_price', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    $session = posSession($user, $location);
+    $product = posProduct($location, '200.00'); // selling_price = 200
+
+    // Client submits a fraudulently low price of 1.00
+    $result = app(CompletePosSale::class)(
+        items: [['product_id' => $product->id, 'quantity' => '1.000', 'unit_price' => '1.00', 'discount_amount' => '0.00']],
+        customerId: walkInCustomer()->id,
+        tenders: [['method' => 'cash', 'amount' => '200.00']],
+        sessionId: $session->id,
+        idempotencyKey: Str::uuid()->toString(),
+    );
+
+    // Server must have used DB price 200, not the tampered 1.00
+    expect((string) $result->invoice->total)->toBe('200.00');
+});
+
+// ─── 19. Discount without pos.discount permission is rejected ─────────────────
+
+test('discount_without_pos_discount_permission_is_rejected', function (): void {
+    $user = posUser(); // no pos.discount
+    $location = posLocation();
+    $this->actingAs($user);
+
+    $session = posSession($user, $location);
+    $product = posProduct($location, '100.00');
+
+    expect(fn () => app(CompletePosSale::class)(
+        items: [['product_id' => $product->id, 'quantity' => '1.000', 'unit_price' => '100.00', 'discount_amount' => '10.00']],
+        customerId: walkInCustomer()->id,
+        tenders: [['method' => 'cash', 'amount' => '90.00']],
+        sessionId: $session->id,
+        idempotencyKey: Str::uuid()->toString(),
+    ))->toThrow(ValidationException::class, 'You are not allowed to give discounts.');
+});
+
+// ─── 20. pos.max_discount_percent enforced with decimal precision (7.5%) ─────
+
+test('discount_above_max_discount_percent_is_rejected', function (): void {
+    $user = posUser(['pos.discount']);
+    $location = posLocation();
+    $this->actingAs($user);
+
+    // 7.5% limit: selling_price=100, qty=1 → line=100, max=7.50
+    app(Settings::class)->put('pos.max_discount_percent', 7.5);
+
+    $session = posSession($user, $location);
+    $product = posProduct($location, '100.00');
+
+    expect(fn () => app(CompletePosSale::class)(
+        items: [['product_id' => $product->id, 'quantity' => '1.000', 'unit_price' => '100.00', 'discount_amount' => '7.60']], // 7.60 > 7.50
+        customerId: walkInCustomer()->id,
+        tenders: [['method' => 'cash', 'amount' => '92.40']],
+        sessionId: $session->id,
+        idempotencyKey: Str::uuid()->toString(),
+    ))->toThrow(ValidationException::class);
+
+    app(Settings::class)->forget('pos.max_discount_percent');
+});
+
+// ─── 21. Discount at exactly pos.max_discount_percent is accepted ─────────────
+
+test('discount_within_max_discount_percent_is_accepted', function (): void {
+    $user = posUser(['pos.discount']);
+    $location = posLocation();
+    $this->actingAs($user);
+
+    // 7.5% limit: 7.50 <= 7.50 → accepted
+    app(Settings::class)->put('pos.max_discount_percent', 7.5);
+
+    $session = posSession($user, $location);
+    $product = posProduct($location, '100.00');
+
+    $result = app(CompletePosSale::class)(
+        items: [['product_id' => $product->id, 'quantity' => '1.000', 'unit_price' => '100.00', 'discount_amount' => '7.50']],
+        customerId: walkInCustomer()->id,
+        tenders: [['method' => 'cash', 'amount' => '92.50']],
+        sessionId: $session->id,
+        idempotencyKey: Str::uuid()->toString(),
+    );
+
+    expect((string) $result->invoice->total)->toBe('92.50');
+
+    app(Settings::class)->forget('pos.max_discount_percent');
+});
+
+// ─── 22. Viewer and Storekeeper cannot access POS ────────────────────────────
+
+test('viewer_cannot_open_the_pos', function (): void {
+    // Viewer has no pos.use
+    $viewer = User::factory()->create();
+    Permission::findOrCreate('inventory.view', 'web');
+    $viewer->givePermissionTo('inventory.view');
+
+    $this->actingAs($viewer);
+    $this->get(route('pos.index'))->assertStatus(403);
+});
+
+test('storekeeper_cannot_open_the_pos', function (): void {
+    // Storekeeper has no pos.use (only inventory permissions)
+    $storekeeper = User::factory()->create();
+    Permission::findOrCreate('inventory.view', 'web');
+    Permission::findOrCreate('inventory.receive', 'web');
+    $storekeeper->givePermissionTo(['inventory.view', 'inventory.receive']);
+
+    $this->actingAs($storekeeper);
+    $this->get(route('pos.index'))->assertStatus(403);
+});
+
+test('storekeeper_cannot_complete_a_sale', function (): void {
+    $storekeeper = User::factory()->create();
+    Permission::findOrCreate('inventory.view', 'web');
+    $storekeeper->givePermissionTo('inventory.view');
+    $location = posLocation();
+
+    $this->actingAs($storekeeper);
+
+    expect(fn () => app(CompletePosSale::class)(
+        items: [['product_id' => 1, 'quantity' => '1.000', 'unit_price' => '100.00', 'discount_amount' => '0.00']],
+        customerId: 1,
+        tenders: [['method' => 'cash', 'amount' => '100.00']],
+        sessionId: 1,
+        idempotencyKey: Str::uuid()->toString(),
+    ))->toThrow(HttpException::class);
+});
+
+// ─── 23. Thermal receipt renders a valid PDF ─────────────────────────────────
+
+test('thermal_receipt_renders_a_pdf', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    $session = posSession($user, $location);
+    $product = posProduct($location, '50.00');
+
+    $result = app(CompletePosSale::class)(
+        items: [['product_id' => $product->id, 'quantity' => '1.000', 'unit_price' => '50.00', 'discount_amount' => '0.00']],
+        customerId: walkInCustomer()->id,
+        tenders: [['method' => 'cash', 'amount' => '50.00']],
+        sessionId: $session->id,
+        idempotencyKey: Str::uuid()->toString(),
+    );
+
+    $payment = Payment::where('pos_session_id', $session->id)->firstOrFail();
+
+    $response = $this->get(route('payments.receipt', ['payment' => $payment->id, 'paper' => 'thermal']));
+
+    $response->assertStatus(200)
+        ->assertHeader('Content-Type', 'application/pdf');
+
+    expect(substr($response->getContent(), 0, 4))->toBe('%PDF');
+});
+
+// ─── 24. Packaging unit: carton price = selling_price × factor ───────────────
+
+test('carton_line_uses_selling_price_times_factor_and_ignores_tampered_price', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    $session = posSession($user, $location);
+
+    $baseUnit = Unit::forceCreate(['name' => 'Piece-'.random_int(1, 9999), 'abbreviation' => 'pc'.random_int(1, 999)]);
+    $carton = Unit::forceCreate(['name' => 'Carton-'.random_int(1, 9999), 'abbreviation' => 'ctn'.random_int(1, 999)]);
+
+    $product = Product::forceCreate([
+        'sku' => 'POS-CTN-'.str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
+        'name' => 'Carton Product '.random_int(1, 9999),
+        'base_unit_id' => $baseUnit->id,
+        'selling_price' => '10.00', // per piece
+        'tax_type' => 'exempt',
+        'reorder_level' => '0.000',
+        'track_batches' => false,
+        'is_active' => true,
+    ]);
+    $product->productUnits()->create(['unit_id' => $carton->id, 'factor' => '24.000']);
+
+    StockLevel::forceCreate([
+        'product_id' => $product->id,
+        'location_id' => $location->id,
+        'batch_id' => null,
+        'quantity' => '100.000',
+    ]);
+
+    // Client submits a tampered unit_price of 1.00 for a carton; correct price = 10 × 24 = 240.00
+    $result = app(CompletePosSale::class)(
+        items: [['product_id' => $product->id, 'unit_id' => $carton->id, 'quantity' => '1.000', 'unit_price' => '1.00', 'discount_amount' => '0.00']],
+        customerId: walkInCustomer()->id,
+        tenders: [['method' => 'cash', 'amount' => '240.00']],
+        sessionId: $session->id,
+        idempotencyKey: Str::uuid()->toString(),
+    );
+
+    // 1 carton × (10.00/piece × 24 pieces/carton) = 240.00
+    expect((string) $result->invoice->total)->toBe('240.00');
+});
+
+// ─── 25. Voiding a POS invoice is blocked until payments are reversed ─────────
+
+test('voiding_a_pos_invoice_is_blocked_while_payments_exist', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    $session = posSession($user, $location);
+    $product = posProduct($location, '100.00');
+
+    $result = app(CompletePosSale::class)(
+        items: [['product_id' => $product->id, 'quantity' => '1.000', 'unit_price' => '100.00', 'discount_amount' => '0.00']],
+        customerId: walkInCustomer()->id,
+        tenders: [['method' => 'cash', 'amount' => '100.00']],
+        sessionId: $session->id,
+        idempotencyKey: Str::uuid()->toString(),
+    );
+
+    $invoice = $result->invoice;
+
+    // Give user void permission
+    Permission::findOrCreate('invoices.void', 'web');
+    $user->givePermissionTo('invoices.void');
+
+    // Void attempt while payment is active → must throw
+    expect(fn () => app(VoidInvoice::class)($invoice, 'Test void'))
+        ->toThrow(ValidationException::class);
+
+    // Reverse the payment
+    $payment = Payment::where('pos_session_id', $session->id)->firstOrFail();
+    Permission::findOrCreate('payments.reverse', 'web');
+    $user->givePermissionTo('payments.reverse');
+    app(ReversePayment::class)($payment, 'Reversal for void test');
+
+    // Now void should succeed
+    $voided = app(VoidInvoice::class)($invoice->fresh(), 'Test void');
+    expect($voided->status->value)->toBe('void');
+});
+
+// ─── 26. Thermal receipt with many allocations renders a valid PDF ────────────
+
+test('thermal_receipt_with_many_allocations_renders_a_pdf', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $customer = walkInCustomer();
+    $this->actingAs($user);
+
+    // Create a payment with 10 invoice allocations
+    $payment = Payment::forceCreate([
+        'number' => 'PAY-MANY-'.random_int(1, 99999),
+        'customer_id' => $customer->id,
+        'method' => 'cash',
+        'amount' => '1000.00',
+        'received_at' => now(),
+        'received_by' => $user->id,
+        'status' => 'active',
+        'idempotency_key' => Str::uuid()->toString(),
+    ]);
+
+    for ($i = 1; $i <= 10; $i++) {
+        $invoice = Invoice::forceCreate([
+            'number' => "INV-MANY-{$i}-".random_int(1, 9999),
+            'channel' => 'invoice',
+            'status' => InvoiceStatus::Issued,
+            'customer_id' => $customer->id,
+            'location_id' => $location->id,
+            'currency' => 'TZS',
+            'prices_include_tax' => false,
+            'subtotal' => '100.00',
+            'discount_total' => '0.00',
+            'tax_total' => '0.00',
+            'total' => '100.00',
+            'amount_paid' => '100.00',
+            'created_by' => $user->id,
+        ]);
+
+        PaymentAllocation::forceCreate([
+            'payment_id' => $payment->id,
+            'invoice_id' => $invoice->id,
+            'amount' => '100.00',
+        ]);
+    }
+
+    $response = $this->get(route('payments.receipt', ['payment' => $payment->id, 'paper' => 'thermal']));
+
+    $response->assertStatus(200)
+        ->assertHeader('Content-Type', 'application/pdf');
+
+    expect(substr($response->getContent(), 0, 4))->toBe('%PDF');
 });

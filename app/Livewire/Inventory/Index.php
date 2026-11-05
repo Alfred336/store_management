@@ -347,18 +347,10 @@ class Index extends Component
 
         $levels = $this->buildQuery()->paginate(50);
 
-        // Per-product totals for alert badges (computed from all locations, not just the filtered page)
+        // Per-product alert badges — derived from the same scopes used everywhere else
         $productIds = $levels->pluck('product_id')->unique()->values()->all();
-        $productTotals = StockLevel::query()
-            ->whereIn('product_id', $productIds)
-            ->selectRaw('product_id, COALESCE(SUM(quantity), 0) as total_qty')
-            ->groupBy('product_id')
-            ->pluck('total_qty', 'product_id');
-
-        // Reorder levels for the same set of products
-        $reorderLevels = Product::query()
-            ->whereIn('id', $productIds)
-            ->pluck('reorder_level', 'id');
+        $lowStockIds = Product::lowStock()->whereIn('id', $productIds)->pluck('id');
+        $outOfStockIds = Product::outOfStock()->whereIn('id', $productIds)->pluck('id');
 
         $locations = Location::query()->where('is_active', true)->orderBy('name')->get();
         $categories = Category::query()->orderBy('name')->get();
@@ -385,7 +377,7 @@ class Index extends Component
             : null;
 
         return view('livewire.inventory.index', compact(
-            'levels', 'productTotals', 'reorderLevels',
+            'levels', 'lowStockIds', 'outOfStockIds',
             'locations', 'categories',
             'receiveBatches', 'receiveProduct',
             'adjustProduct', 'transferProduct'

@@ -64,12 +64,13 @@ class PaymentReceiptController extends Controller
         ];
 
         $template = $paper === 'thermal' ? 'payments.receipt-thermal' : 'payments.receipt';
-        $paperSize = $paper === 'thermal' ? [80, 200] : 'a4';
 
         $pdf = Pdf::loadView($template, $data);
 
         if ($paper === 'thermal') {
-            $pdf->setPaper($paperSize, 'portrait');
+            // 80 mm × 2.8346 pt/mm = 226.77 pt; height scales with allocation count like invoice thermal template
+            $heightPt = max(300.0, 120.0 + (count($allocations) * 22.0) + 100.0);
+            $pdf->setPaper([0, 0, 226.77, $heightPt], 'portrait');
         } else {
             $pdf->setPaper('a4', 'portrait');
         }

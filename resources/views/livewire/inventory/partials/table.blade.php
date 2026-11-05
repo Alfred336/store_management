@@ -32,18 +32,9 @@
                             <span class="text-xs text-zinc-500">{{ $level->product->baseUnit->abbreviation }}</span>
                         </flux:table.cell>
                         <flux:table.cell>
-                            @php
-                                $productId = $level->product_id;
-                                $totalQty = $productTotals[$productId] ?? '0';
-                                $reorder = $reorderLevels[$productId] ?? '0';
-                                $isOutOfStock = bccomp($totalQty, '0', 3) === 0;
-                                $isLowStock = !$isOutOfStock
-                                    && bccomp($reorder, '0', 3) > 0
-                                    && bccomp($totalQty, $reorder, 3) <= 0;
-                            @endphp
-                            @if ($isOutOfStock)
+                            @if ($outOfStockIds->contains($level->product_id))
                                 <span class="rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300">Out of stock</span>
-                            @elseif ($isLowStock)
+                            @elseif ($lowStockIds->contains($level->product_id))
                                 <span class="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">Low stock</span>
                             @endif
                         </flux:table.cell>
