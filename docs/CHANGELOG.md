@@ -1,5 +1,25 @@
 # Changelog
 
+## [Phase 6] - 2026-11-05
+
+### Added
+
+- **`ReceiveStock` Action** (`app/Livewire/Actions/Inventory/ReceiveStock.php`): Authorizes `inventory.receive`. Locks product row, resolves or creates batch for batch-tracked products (unique-per-product validation), delegates to `StockService::receive()` with unit conversion. All in one DB transaction.
+- **`AdjustStock` Action** (`app/Livewire/Actions/Inventory/AdjustStock.php`): Authorizes `inventory.adjust`. Delegates signed quantity + reason to `StockService::adjust()`.
+- **`TransferStock` Action** (`app/Livewire/Actions/Inventory/TransferStock.php`): Authorizes `inventory.transfer`. Delegates to `StockService::transfer()`.
+- **Stock on Hand screen** (`app/Livewire/Inventory/Index.php`, route `GET /inventory` → `inventory.index`): Paginated flat rows from `stock_levels`; filters by location, category, out-of-stock, low-stock, expiring-within-N-days; ILIKE search by name/SKU/barcode. Alert badges computed from product totals across all locations. Receive/Adjust/Transfer flyout modals.
+- **Stock Ledger screen** (`app/Livewire/Inventory/Ledger/Index.php`, route `GET /inventory/ledger` → `inventory.ledger`): Read-only stock movement history; filters by date range, product, location, movement type, user; paginates at 50.
+- **Blade views**: `resources/views/livewire/inventory/index.blade.php` and partials (table, receive-form, adjust-form, transfer-form); `resources/views/livewire/inventory/ledger/index.blade.php` and partials (table).
+- **Sidebar**: "Stock on Hand" and "Stock Ledger" links added under the Inventory group, guarded by `inventory.view`.
+- **`Product` scopes**: `outOfStock()` and `lowStock()` added with PostgreSQL subqueries (safe in WHERE). `lowStock()` now correctly excludes zero-qty products and products with `reorder_level = 0`.
+- **Permissions**: `inventory.view`, `inventory.receive`, `inventory.adjust`, `inventory.transfer` added to `EnsureSystemRoles`. Admin and Storekeeper get all four; Cashier and Viewer get `inventory.view` only.
+- **`InventoryScreenTest`** (`tests/Feature/Inventory/InventoryScreenTest.php`): 20 tests covering authorization, receive (non-batch, new batch, existing batch, missing batch, unit conversion), adjust (positive, negative, missing reason, insufficient stock), transfer (success, same-location, insufficient stock), filters (location, category, out-of-stock), stock alert scopes, ledger (order, type filter, date filter), and ledger invariant.
+
+### Changed
+
+- `EnsureSystemRoles`: Admin permission count 38 → 42; Storekeeper count 15 → 19; Viewer count 7 → 8.
+- `InventoryCrudTest`: Role-seeder assertion counts updated to reflect new permission totals.
+
 ## [Phase 5] - 2026-11-04
 
 ### Added

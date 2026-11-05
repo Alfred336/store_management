@@ -117,7 +117,15 @@ Run code formatting and style fixes:
 
 ### 7. Inventory & Stock Suite (`tests/Feature/Inventory/`)
 
-- Tests CRUD operations for units, categories, locations, products, batch tracking, transfers, adjustments, and receipts.
+- **CRUD** (`tests/Feature/InventoryCrudTest.php`): units, categories, locations, products (batch tracking, packaging units, SKU uniqueness, soft-delete guard).
+- **Inventory Operations Screen** (`tests/Feature/Inventory/InventoryScreenTest.php`):
+  - **Authorization**: Viewer can view but cannot receive/adjust/transfer; Storekeeper can open all operation modals; unauthenticated redirected to login.
+  - **Receive**: Non-batch product creates stock level and movement; batch product with new batch creates batch record; existing-batch receive adds to that batch; missing batch fails validation; packaging unit conversion multiplies by factor.
+  - **Adjust**: Positive/negative quantities update stock level; missing reason fails validation; negative adjustment exceeding stock returns `adjustQuantity` error.
+  - **Transfer**: Moves stock between locations; same-location fails validation; insufficient stock returns `transferQuantity` error.
+  - **Filters**: Location filter, category filter, and out-of-stock filter restrict rows correctly.
+  - **Stock alert scopes**: `outOfStock()` returns only zero-qty products; `lowStock()` returns products at/below reorder level with stock; at-exactly-reorder-level counts as low; zero-qty is out-of-stock, not low-stock; `reorder_level = 0` products are never low-stock.
+  - **Ledger**: Movements visible in reverse order; type filter restricts; date-from filter hides older records; ledger invariant `SUM(movements) = SUM(stock_levels)` holds.
 
 ### 8. POS Suite (`tests/Feature/Pos/PosModuleTest.php`)
 

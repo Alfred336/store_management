@@ -21,6 +21,8 @@ First-run setup is registered in the Initial setup section of `routes/web.php`, 
 | GET | `/invoices/{invoice}/documents/{document}` | `invoices.document.download` | Download a saved PDF from the private disk (`InvoicePdfController@download`) |
 | GET | `/payments` | `payments.index` | `App\Livewire\Payments\Index` |
 | GET | `/payments/{payment}/receipt` | `payments.receipt` | Stream a payment receipt PDF (`PaymentReceiptController`; `?paper=a4\|thermal&mode=inline\|download`) |
+| GET | `/inventory` | `inventory.index` | `App\Livewire\Inventory\Index` |
+| GET | `/inventory/ledger` | `inventory.ledger` | `App\Livewire\Inventory\Ledger\Index` |
 
 Routes are grouped and commented in `routes/web.php`: setup outside auth, followed by dashboard, inventory, customers, and business settings inside the authenticated group. Create, details, update, and delete interactions are modal/actions on each resource's Index component; there are no separate create/edit/show routes or resource controllers. Every component operation and Action enforces its registered policy.
 

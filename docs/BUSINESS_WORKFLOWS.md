@@ -74,6 +74,29 @@ If insufficient stock or any validation fails, the entire transaction rolls back
 
 `VoidInvoice` is blocked (`ValidationException`) when any active payment allocation exists against the invoice. Reverse all relevant payments before voiding.
 
+## Inventory Operations (Phase 6)
+
+### Receive
+
+`ReceiveStock` wraps the entire operation in a DB transaction. It locks the product row, resolves the batch (see below), then delegates to `StockService::receive()` which creates or updates the `stock_levels` row and writes a `receipt` movement. Unit conversion: if `unit_id` is supplied, the quantity is converted to the base unit via `StockService::convertToBase()` before persisting.
+
+**Batch resolution for batch-tracked products**: if `batch_id` is supplied and positive, the existing batch is used. Otherwise `batch_number` must be non-empty; `ReceiveStock` validates it is unique for that product and creates a new `Batch` row (optionally with `expiry_date`) inside the same transaction. Non-batch-tracked products ignore both fields.
+
+### Adjust
+
+`AdjustStock` delegates to `StockService::adjust()`. A signed decimal quantity is required (positive = add, negative = remove); a human-readable reason is mandatory. Insufficient stock for a negative adjustment throws `InsufficientStockException`, which the Livewire component catches and re-surfaces on the quantity field.
+
+### Transfer
+
+`TransferStock` delegates to `StockService::transfer()`, which writes a `transfer_out` movement at the source and a `transfer_in` movement at the destination inside one transaction with deadlock-safe locking order. Insufficient stock at the source throws `InsufficientStockException`.
+
+### Stock alert rule
+
+Two `Product` model scopes compute alert states using PostgreSQL subqueries against `stock_levels` (not column aliases, so they are safe in WHERE):
+
+- `outOfStock()`: `SUM(stock_levels.quantity) = 0` for the product across all locations.
+- `lowStock()`: `SUM > 0 AND reorder_level > 0 AND SUM <= reorder_level`. Products with `reorder_level = 0` are never "low stock".
+
 ## Customer statements
 
 Customer balances are calculated at read time from issued, partially paid, and paid invoices (`total − amount_paid`); draft and void invoices are excluded. The in-app details panel lists recent invoices and payments, while the downloadable PDF statement renders full history.

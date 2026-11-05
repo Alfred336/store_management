@@ -7,6 +7,8 @@ use App\Http\Controllers\PaymentReceiptController;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Livewire\Dashboard\Index as DashboardIndex;
+use App\Livewire\Inventory\Index as InventoryIndex;
+use App\Livewire\Inventory\Ledger\Index as InventoryLedgerIndex;
 use App\Livewire\Invoicing\Index as InvoicingIndex;
 use App\Livewire\Locations\Index as LocationsIndex;
 use App\Livewire\Payments\Index as PaymentsIndex;
@@ -48,6 +50,10 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     // Payments: list, receive, and receipt.
     Route::livewire('payments', PaymentsIndex::class)->name('payments.index');
     Route::get('payments/{payment}/receipt', PaymentReceiptController::class)->name('payments.receipt');
+
+    // Inventory operations: stock on hand and stock ledger.
+    Route::livewire('inventory', InventoryIndex::class)->name('inventory.index');
+    Route::livewire('inventory/ledger', InventoryLedgerIndex::class)->name('inventory.ledger');
 
     // Point of Sale.
     Route::livewire('pos', PosIndex::class)->name('pos.index');

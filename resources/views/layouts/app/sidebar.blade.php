@@ -18,6 +18,10 @@
                 </flux:sidebar.group>
 
                 <flux:sidebar.group heading="Inventory" class="grid">
+                    @can('inventory.view')
+                        <flux:sidebar.item icon="archive-box" :href="route('inventory.index')" :current="request()->routeIs('inventory.index')" wire:navigate>Stock on Hand</flux:sidebar.item>
+                        <flux:sidebar.item icon="clipboard-document-list" :href="route('inventory.ledger')" :current="request()->routeIs('inventory.ledger')" wire:navigate>Stock Ledger</flux:sidebar.item>
+                    @endcan
                     @can('viewAny', App\Models\Product::class)
                         <flux:sidebar.item icon="cube" :href="route('products.index')" :current="request()->routeIs('products.*')" wire:navigate>Products</flux:sidebar.item>
                     @endcan

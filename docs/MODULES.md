@@ -100,7 +100,22 @@
   - Held sales never touch stock or document sequences.
   - Tenders sum must ≥ invoice total for cash sales; credit sales require the named customer to be within credit limit.
 
-## 9. Settings & Document Sequences
+## 9. Inventory Operations Screens (Phase 6)
+
+- **Location**: `app/Livewire/Inventory/Index.php`, `app/Livewire/Inventory/Ledger/Index.php`, `app/Livewire/Actions/Inventory/`
+- **Screens**:
+  - **Stock on Hand** (`/inventory`): Flat per-location/per-batch rows from `stock_levels`; filters by location, category, out-of-stock, low-stock, expiring-within-N-days; ILIKE search by name/SKU/barcode. Alert badges computed from product totals across all locations.
+  - **Stock Ledger** (`/inventory/ledger`): Read-only movement history with date-range, product, location, type, and user filters; paginates at 50 per page.
+- **Actions** (in `app/Livewire/Actions/Inventory/`):
+  - `ReceiveStock`: Authorizes `inventory.receive`. For batch-tracked products, resolves an existing batch or creates a new one (unique per product) in the same DB transaction.
+  - `AdjustStock`: Authorizes `inventory.adjust`. Delegates signed-quantity adjustment to `StockService::adjust()`.
+  - `TransferStock`: Authorizes `inventory.transfer`. Delegates to `StockService::transfer()`.
+- **Stock Alert Rule** (defined as `Product` model scopes):
+  - `outOfStock()`: total qty across all locations = 0.
+  - `lowStock()`: total qty > 0, `reorder_level > 0`, total qty <= `reorder_level`. PostgreSQL subquery, not column alias, so it is safe in WHERE.
+- **Permissions**: `inventory.view` (all roles except unauthenticated), `inventory.receive` / `inventory.adjust` / `inventory.transfer` (Admin + Storekeeper only).
+
+## 10. Settings & Document Sequences
 
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:

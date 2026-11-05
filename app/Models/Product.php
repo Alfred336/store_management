@@ -100,12 +100,31 @@ class Product extends Model
     }
 
     /**
+     * "Out of stock": product has zero total quantity across all locations.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeOutOfStock(Builder $query): Builder
+    {
+        return $query->whereRaw(
+            '(SELECT COALESCE(SUM(quantity), 0) FROM stock_levels WHERE stock_levels.product_id = products.id) = 0'
+        );
+    }
+
+    /**
+     * "Low stock": total qty > 0, reorder_level > 0, and total qty <= reorder_level.
+     * Products with reorder_level = 0 are never "low stock".
+     *
      * @param  Builder<Product>  $query
      * @return Builder<Product>
      */
     public function scopeLowStock(Builder $query): Builder
     {
-        return $query->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM stock_levels WHERE stock_levels.product_id = products.id) <= products.reorder_level');
+        return $query
+            ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM stock_levels WHERE stock_levels.product_id = products.id) > 0')
+            ->whereRaw('products.reorder_level > 0')
+            ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM stock_levels WHERE stock_levels.product_id = products.id) <= products.reorder_level');
     }
 
     /**
