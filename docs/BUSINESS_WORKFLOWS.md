@@ -100,3 +100,29 @@ Two `Product` model scopes compute alert states using PostgreSQL subqueries agai
 ## Customer statements
 
 Customer balances are calculated at read time from issued, partially paid, and paid invoices (`total − amount_paid`); draft and void invoices are excluded. The in-app details panel lists recent invoices and payments, while the downloadable PDF statement renders full history.
+## Reports (Phase 6A)
+
+### Sales Summary and VAT Summary
+
+Both reports query only *posted* invoices: those with status `issued`, `partially_paid`, or `paid`. Drafts and voided invoices are always excluded. Figures come from invoice-level aggregate columns (`subtotal`, `discount_total`, `tax_total`, `total`) for the Sales Summary, and from invoice item line columns (`line_total`, `line_tax`, `tax_type`) for the VAT Summary. All aggregation happens in a single SQL `GROUP BY` query; no rows are loaded into PHP collections.
+
+The Sales Summary groups rows by day when the selected range is 31 days or fewer, and by month otherwise.
+
+### Receivables Aging
+
+Aging buckets measure how far past due each open invoice is on the selected as-of date:
+
+- **Current (0–30 days)**: `due_date >= as_of_date` (not yet due, or due today).
+- **31–60 days**: `due_date < as_of_date AND due_date >= as_of_date − 60 days`.
+- **61–90 days**: `due_date < as_of_date − 30 days AND due_date >= as_of_date − 90 days`.
+- **90+ days**: `due_date < as_of_date − 90 days`.
+
+Invoices with no `due_date` are treated as current. Only `issued` and `partially_paid` invoices are included; `paid` and `void` are excluded.
+
+### Voided Invoices Audit
+
+The date filter applies to `voided_at`, not `issue_date`. The timezone for the date boundary is Africa/Dar_es_Salaam, computed via `DATE(voided_at AT TIME ZONE 'Africa/Dar_es_Salaam')`.
+
+### Exports
+
+XLSX and CSV exports re-execute the same SQL queries on demand. All text columns (names, codes, reasons) are sanitized against spreadsheet formula injection by prepending `'` to values starting with `=`, `+`, `-`, or `@`.

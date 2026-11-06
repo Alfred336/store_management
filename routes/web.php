@@ -4,6 +4,7 @@ use App\Http\Controllers\Customers\CustomerExportController;
 use App\Http\Controllers\Customers\CustomerStatementController;
 use App\Http\Controllers\InvoicePdfController;
 use App\Http\Controllers\PaymentReceiptController;
+use App\Http\Controllers\Reports\ReportPdfController;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Livewire\Dashboard\Index as DashboardIndex;
@@ -13,6 +14,13 @@ use App\Livewire\Invoicing\Index as InvoicingIndex;
 use App\Livewire\Locations\Index as LocationsIndex;
 use App\Livewire\Payments\Index as PaymentsIndex;
 use App\Livewire\Products\Index as ProductsIndex;
+use App\Livewire\Reports\Inventory\Index as ReportInventoryIndex;
+use App\Livewire\Reports\Payments\Index as ReportPaymentsIndex;
+use App\Livewire\Reports\PosSessions\Index as ReportPosSessionsIndex;
+use App\Livewire\Reports\Receivables\Index as ReportReceivablesIndex;
+use App\Livewire\Reports\Sales\Index as ReportSalesIndex;
+use App\Livewire\Reports\Vat\Index as ReportVatIndex;
+use App\Livewire\Reports\VoidedInvoices\Index as ReportVoidedInvoicesIndex;
 use App\Livewire\Sales\Pos\Index as PosIndex;
 use App\Livewire\Settings\Index as BusinessSettingsIndex;
 use App\Livewire\Setup\Index as SetupIndex;
@@ -57,6 +65,16 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     // Point of Sale.
     Route::livewire('pos', PosIndex::class)->name('pos.index');
+
+    // Reports: view screens and PDF export.
+    Route::livewire('reports/sales', ReportSalesIndex::class)->name('reports.sales');
+    Route::livewire('reports/vat', ReportVatIndex::class)->name('reports.vat');
+    Route::livewire('reports/receivables', ReportReceivablesIndex::class)->name('reports.receivables');
+    Route::livewire('reports/payments', ReportPaymentsIndex::class)->name('reports.payments');
+    Route::livewire('reports/pos-sessions', ReportPosSessionsIndex::class)->name('reports.pos_sessions');
+    Route::livewire('reports/inventory', ReportInventoryIndex::class)->name('reports.inventory');
+    Route::livewire('reports/voided-invoices', ReportVoidedInvoicesIndex::class)->name('reports.voided_invoices');
+    Route::get('reports/{report}/pdf', ReportPdfController::class)->name('reports.pdf');
 });
 
 require __DIR__.'/settings.php';

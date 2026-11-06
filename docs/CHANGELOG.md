@@ -1,5 +1,26 @@
 # Changelog
 
+## [Phase 6A: Reports] - 2026-11-06
+
+### Added
+
+- **Report Services** (`app/Services/Reports/`): 7 services — `SalesSummaryService`, `VatSummaryService`, `ReceivablesAgingService`, `PaymentsByMethodService`, `PosSessionsService`, `InventoryReportService`, `VoidedInvoicesService`. All aggregate in SQL; no large PHP collections.
+- **Livewire Report Screens** (`app/Livewire/Reports/<Area>/Index.php`): One `Index.php` per report under `Sales`, `Vat`, `Receivables`, `Payments`, `PosSessions`, `Inventory`, `VoidedInvoices`. Default date range = current month in Africa/Dar_es_Salaam timezone.
+- **Blade Views** (`resources/views/livewire/reports/`): One `index.blade.php` per report with filter controls, summary table, and totals row.
+- **Excel/CSV Exports** (`app/Exports/Reports/`): 7 export classes using `FromCollection`, `WithHeadings`, `WithMapping`. All text columns sanitized against formula injection.
+- **PDF Export Controller** (`app/Http/Controllers/Reports/ReportPdfController.php`): Single invokable controller serving all 7 reports as A4 landscape PDFs with company header; route `GET /reports/{report}/pdf` (`reports.pdf`).
+- **PDF Blade Templates** (`resources/views/reports/pdf/`): Per-report templates sharing `partials/header.blade.php` and `partials/footer.blade.php`.
+- **Routes**: 7 Livewire routes + 1 PDF route added to the `Reports` section in `routes/web.php`.
+- **Sidebar**: "Reports" group visible to `reports.view` with links to all 7 screens.
+- **Permissions**: `reports.view` and `reports.export` added to `EnsureSystemRoles`. Admin gets both; Storekeeper and Viewer get `reports.view`; Cashier gets neither.
+- **Tests** (`tests/Feature/Reports/ReportsModuleTest.php`): 15 tests covering auth checks (cashier blocked, viewer access, export permission), sales totals, exclusion of drafts/voids, date range filter, location filter, aging bucket boundaries, boundary edge case (due today = current), aging excludes paid invoices, voided invoices range, inventory stock value, PDF endpoint (200 + %PDF, 403 for cashier, 404 for unknown slug).
+- **Docs**: `MODULES.md` §10 added.
+
+### Changed
+
+- `EnsureSystemRoles`: Added `reports.view` to Admin, Storekeeper, Viewer; added `reports.export` to Admin. Admin count 42 → 44; Storekeeper count 19 → 20; Viewer count 8 → 9.
+- `InventoryCrudTest`: Role-seeder assertion counts updated to reflect new permission totals.
+
 ## [Inventory screens] - 2026-11-05
 
 ### Added

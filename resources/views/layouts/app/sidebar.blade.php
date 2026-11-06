@@ -35,6 +35,17 @@
                         <flux:sidebar.item icon="map-pin" :href="route('locations.index')" :current="request()->routeIs('locations.*')" wire:navigate>Locations</flux:sidebar.item>
                     @endcan
                 </flux:sidebar.group>
+                @can('reports.view')
+                    <flux:sidebar.group heading="Reports" class="grid">
+                        <flux:sidebar.item icon="chart-bar" :href="route('reports.sales')" :current="request()->routeIs('reports.sales')" wire:navigate>Sales Summary</flux:sidebar.item>
+                        <flux:sidebar.item icon="document-chart-bar" :href="route('reports.vat')" :current="request()->routeIs('reports.vat')" wire:navigate>VAT Summary</flux:sidebar.item>
+                        <flux:sidebar.item icon="clock" :href="route('reports.receivables')" :current="request()->routeIs('reports.receivables')" wire:navigate>Receivables Aging</flux:sidebar.item>
+                        <flux:sidebar.item icon="banknotes" :href="route('reports.payments')" :current="request()->routeIs('reports.payments')" wire:navigate>Payments by Method</flux:sidebar.item>
+                        <flux:sidebar.item icon="computer-desktop" :href="route('reports.pos_sessions')" :current="request()->routeIs('reports.pos_sessions')" wire:navigate>POS Sessions</flux:sidebar.item>
+                        <flux:sidebar.item icon="archive-box" :href="route('reports.inventory')" :current="request()->routeIs('reports.inventory')" wire:navigate>Inventory</flux:sidebar.item>
+                        <flux:sidebar.item icon="x-circle" :href="route('reports.voided_invoices')" :current="request()->routeIs('reports.voided_invoices')" wire:navigate>Voided Invoices</flux:sidebar.item>
+                    </flux:sidebar.group>
+                @endcan
                 @can('viewAny', App\Models\Setting::class)
                     <flux:sidebar.group heading="Administration" class="grid">
                         <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>Business settings</flux:sidebar.item>

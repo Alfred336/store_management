@@ -23,6 +23,14 @@ First-run setup is registered in the Initial setup section of `routes/web.php`, 
 | GET | `/payments/{payment}/receipt` | `payments.receipt` | Stream a payment receipt PDF (`PaymentReceiptController`; `?paper=a4\|thermal&mode=inline\|download`) |
 | GET | `/inventory` | `inventory.index` | `App\Livewire\Inventory\Index` |
 | GET | `/inventory/ledger` | `inventory.ledger` | `App\Livewire\Inventory\Ledger\Index` |
+| GET | `/reports/sales` | `reports.sales` | `App\Livewire\Reports\Sales\Index` |
+| GET | `/reports/vat` | `reports.vat` | `App\Livewire\Reports\Vat\Index` |
+| GET | `/reports/receivables` | `reports.receivables` | `App\Livewire\Reports\Receivables\Index` |
+| GET | `/reports/payments` | `reports.payments` | `App\Livewire\Reports\Payments\Index` |
+| GET | `/reports/pos-sessions` | `reports.pos_sessions` | `App\Livewire\Reports\PosSessions\Index` |
+| GET | `/reports/inventory` | `reports.inventory` | `App\Livewire\Reports\Inventory\Index` |
+| GET | `/reports/voided-invoices` | `reports.voided_invoices` | `App\Livewire\Reports\VoidedInvoices\Index` |
+| GET | `/reports/{report}/pdf` | `reports.pdf` | `ReportPdfController` (A4 landscape DomPDF; slugs: `sales`, `vat`, `receivables`, `payments`, `pos-sessions`, `inventory`, `voided-invoices`) |
 
 Routes are grouped and commented in `routes/web.php`: setup outside auth, followed by dashboard, inventory, customers, and business settings inside the authenticated group. Create, details, update, and delete interactions are modal/actions on each resource's Index component; there are no separate create/edit/show routes or resource controllers. Every component operation and Action enforces its registered policy.
 

@@ -127,7 +127,18 @@ Run code formatting and style fixes:
   - **Stock alert scopes**: `outOfStock()` returns only zero-qty products; `lowStock()` returns products at/below reorder level with stock; at-exactly-reorder-level counts as low; zero-qty is out-of-stock, not low-stock; `reorder_level = 0` products are never low-stock.
   - **Ledger**: Movements visible in reverse order; type filter restricts; date-from filter hides older records; ledger invariant `SUM(movements) = SUM(stock_levels)` holds.
 
-### 8. POS Suite (`tests/Feature/Pos/PosModuleTest.php`)
+### 8. Reports Suite (`tests/Feature/Reports/ReportsModuleTest.php`)
+
+- **Authorization**: Cashier (no `reports.view`) gets 403 on all 6 tested screens; viewer with `reports.view` gets 200; viewer without `reports.export` gets 403 on export actions; admin with `reports.export` gets 200 from exportXlsx.
+- **EnsureSystemRoles**: `reports.view` granted to Admin, Storekeeper, Viewer; `reports.export` granted to Admin only; Cashier gets neither.
+- **Sales Summary**: Posted invoices (issued/partially_paid/paid) totals correct; drafts and voids excluded; date-range filter hides out-of-range invoices; location filter includes only matching location.
+- **VAT Summary**: Correctly separates standard taxable amount, exempt amount, VAT, and gross total from invoice items.
+- **Receivables Aging**: Buckets by days overdue (current/31-60/61-90/90+); paid invoices excluded; invoice due exactly on as-of date goes into current bucket.
+- **Voided Invoices**: Only void invoices within date range; outside-range voids excluded; issued invoices excluded.
+- **Inventory Report**: Stock value = quantity × selling_price computed correctly.
+- **PDF endpoint**: 200 + `Content-Type: application/pdf` + `%PDF` prefix for `sales` and `inventory` slugs; 403 for cashier; 404 for unknown slug.
+
+### 9. POS Suite (`tests/Feature/Pos/PosModuleTest.php`)
 
 - **Session Management**: Cashier opens a session; duplicate open session is blocked; closing computes `expected_cash` and `difference`; manager force-closes another user's session; non-owner without `pos.close_any_session` is blocked.
 - **Sale Completion**: `CompletePosSale` issues RCT-numbered invoice; uses `selling_price` as default unit price; records `amount_tendered` and `change_given` on cash payments; aggregates multiple tenders across separate `Payment` rows.

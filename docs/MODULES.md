@@ -115,7 +115,23 @@
   - `lowStock()`: total qty > 0, `reorder_level > 0`, total qty <= `reorder_level`. PostgreSQL subquery, not column alias, so it is safe in WHERE.
 - **Permissions**: `inventory.view` (all roles except unauthenticated), `inventory.receive` / `inventory.adjust` / `inventory.transfer` (Admin + Storekeeper only).
 
-## 10. Settings & Document Sequences
+## 10. Reports (Phase 6A)
+
+- **Location**: `app/Livewire/Reports/<Area>/Index.php`, `app/Services/Reports/`, `app/Exports/Reports/`, `app/Http/Controllers/Reports/ReportPdfController.php`
+- **Reports**:
+  - **Sales Summary** (`/reports/sales`): Aggregated posted invoices (issued / partially_paid / paid) grouped by day (≤31-day range) or month. Columns: period, invoice count, subtotal, discounts, VAT, total.
+  - **VAT Summary** (`/reports/vat`): Per-day breakdown of taxable vs exempt amounts and VAT from invoice line items. Excludes drafts and voids.
+  - **Receivables Aging** (`/reports/receivables`): Outstanding customer balances bucketed as Current (0–30 d), 31–60 d, 61–90 d, 90+ d measured from an as-of date (default today). Excludes fully paid and void invoices.
+  - **Payments by Method** (`/reports/payments`): Count and total amount for completed payments grouped by method over a date range.
+  - **POS Sessions** (`/reports/pos-sessions`): Paginated closed sessions with opening/expected/counted cash and variance, filtered by date and location.
+  - **Inventory** (`/reports/inventory`): Current stock on hand with estimated stock value (quantity × selling_price), filterable by location and category.
+  - **Voided Invoices Audit** (`/reports/voided-invoices`): Paginated voided invoices within a date range, with who voided and why.
+- **Exports**: Excel (XLSX) and CSV via `maatwebsite/excel ^4.0` using `FromCollection`, `WithHeadings`, `WithMapping`. All text values sanitized against formula injection (`safeText()`).
+- **PDF Export**: `ReportPdfController` renders any of the 7 reports as A4 landscape via DomPDF with company header from `Settings` and filter summary on the document.
+- **Timezone**: Date boundaries use Africa/Dar_es_Salaam for `voided_at` and POS session `opened_at` date casting; `issue_date` and `received_at` are stored as dates (no TZ conversion needed).
+- **Permissions**: `reports.view` (Admin, Storekeeper, Viewer), `reports.export` (Admin only). Authorized in `mount()` and every export action.
+
+## 11. Settings & Document Sequences
 
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:
