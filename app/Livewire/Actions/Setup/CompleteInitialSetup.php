@@ -36,6 +36,7 @@ class CompleteInitialSetup
                 'email' => $data['admin_email'],
                 'password' => $data['password'],
                 'email_verified_at' => now(),
+                'is_active' => true,
             ]);
             $user->save();
             $user->assignRole('Admin');

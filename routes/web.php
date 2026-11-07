@@ -5,6 +5,7 @@ use App\Http\Controllers\Customers\CustomerStatementController;
 use App\Http\Controllers\InvoicePdfController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\Reports\ReportPdfController;
+use App\Livewire\Auth\ChangePassword;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Livewire\Dashboard\Index as DashboardIndex;
@@ -25,6 +26,7 @@ use App\Livewire\Sales\Pos\Index as PosIndex;
 use App\Livewire\Settings\Index as BusinessSettingsIndex;
 use App\Livewire\Setup\Index as SetupIndex;
 use App\Livewire\Units\Index as UnitsIndex;
+use App\Livewire\Users\Index as UsersIndex;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login')->name('home');
@@ -65,6 +67,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     // Point of Sale.
     Route::livewire('pos', PosIndex::class)->name('pos.index');
+
+    // Administration: user management.
+    Route::livewire('admin/users', UsersIndex::class)->name('users.index');
+
+    // Forced password change (exempt from password.confirm).
+    Route::livewire('password/change', ChangePassword::class)->name('password.change');
 
     // Reports: view screens and PDF export.
     Route::livewire('reports/sales', ReportSalesIndex::class)->name('reports.sales');

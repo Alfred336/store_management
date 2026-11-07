@@ -31,6 +31,8 @@ First-run setup is registered in the Initial setup section of `routes/web.php`, 
 | GET | `/reports/inventory` | `reports.inventory` | `App\Livewire\Reports\Inventory\Index` |
 | GET | `/reports/voided-invoices` | `reports.voided_invoices` | `App\Livewire\Reports\VoidedInvoices\Index` |
 | GET | `/reports/{report}/pdf` | `reports.pdf` | `ReportPdfController` (A4 landscape DomPDF; slugs: `sales`, `vat`, `receivables`, `payments`, `pos-sessions`, `inventory`, `voided-invoices`) |
+| GET | `/admin/users` | `users.index` | `App\Livewire\Users\Index` |
+| GET | `/password/change` | `password.change` | `App\Livewire\Auth\ChangePassword` |
 
 Routes are grouped and commented in `routes/web.php`: setup outside auth, followed by dashboard, inventory, customers, and business settings inside the authenticated group. Create, details, update, and delete interactions are modal/actions on each resource's Index component; there are no separate create/edit/show routes or resource controllers. Every component operation and Action enforces its registered policy.
 

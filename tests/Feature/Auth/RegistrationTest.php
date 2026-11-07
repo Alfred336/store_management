@@ -1,27 +1,17 @@
 <?php
 
-use Laravel\Fortify\Features;
+// Public registration is disabled. Users are created only by administrators.
+// The /register route must return 404.
 
-beforeEach(function () {
-    $this->skipUnlessFortifyHas(Features::registration());
+test('register route returns 404 when registration is disabled', function () {
+    $this->get('/register')->assertStatus(404);
 });
 
-test('registration screen can be rendered', function () {
-    $response = $this->get(route('register'));
-
-    $response->assertOk();
-});
-
-test('new users can register', function () {
-    $response = $this->post(route('register.store'), [
-        'name' => 'John Doe',
+test('register post route returns 404 when registration is disabled', function () {
+    $this->post('/register', [
+        'name' => 'Test User',
         'email' => 'test@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
-    ]);
-
-    $response->assertSessionHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
-
-    $this->assertAuthenticated();
+    ])->assertStatus(404);
 });

@@ -28,10 +28,13 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
  * @property string|null $remember_token
+ * @property bool $is_active
+ * @property Carbon|null $last_login_at
+ * @property bool $must_change_password
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'is_active', 'last_login_at', 'must_change_password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
@@ -49,7 +52,6 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             app(SetupStatus::class)->forget();
             DB::afterCommit(fn () => app(SetupStatus::class)->forget());
         });
-
     }
 
     /**
@@ -61,7 +63,10 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
         ];
     }
 
@@ -75,5 +80,13 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return Str::length($initials) > 1
             ? Str::substr($initials, 0, 1).Str::substr($initials, -1)
             : $initials;
+    }
+
+    /**
+     * Delete all sessions for this user (forces immediate logout everywhere).
+     */
+    public function deleteSessions(): void
+    {
+        DB::table('sessions')->where('user_id', $this->id)->delete();
     }
 }

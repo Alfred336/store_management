@@ -37,6 +37,8 @@ class EnsureSystemRoles
             'pos.use', 'pos.open_session', 'pos.close_session', 'pos.close_any_session', 'pos.discount', 'pos.credit_sale',
             'inventory.view', 'inventory.receive', 'inventory.adjust', 'inventory.transfer',
             'reports.view', 'reports.export',
+            'users.view', 'users.create', 'users.update', 'users.deactivate', 'users.reset_password', 'users.delete',
+            'audit.view',
         ]);
         $cashierPermissions = [
             'dashboard.view', 'products.view', 'categories.view', 'units.view', 'locations.view',

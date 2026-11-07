@@ -1,5 +1,31 @@
 # Changelog
 
+## [Phase 7A: User Management] - 2026-11-06
+
+### Added
+
+- **Migration** `2026_11_06_000002_add_active_login_columns_to_users_table.php`: adds `users.is_active` (bool default true), `users.last_login_at` (nullable timestamp), `users.must_change_password` (bool default false).
+- **Migration** `2026_11_06_000003_create_admin_audit_logs_table.php`: `admin_audit_logs (id, actor_id FK nullable, action, subject_type, subject_id, changes jsonb, ip_address, created_at)` with indexes on `(subject_type, subject_id)` and `(actor_id, created_at)`.
+- **User Actions** (`app/Livewire/Actions/Users/`): `CreateUser`, `UpdateUser`, `DeactivateUser`, `ReactivateUser`, `ResetUserPassword`, `ResetTwoFactor`, `DeleteUser` — all with last-Admin protection, self-protection, privilege-escalation checks, session invalidation, and audit logging.
+- **`AdminAuditLog` model** (`app/Models/AdminAuditLog.php`): static `record()` method; never logs passwords.
+- **`AdminAccountProtection`** updated to count only `is_active = true` admins in `isLastAdmin`, `lockAdmins`, and `adminCount`.
+- **`UserPolicy`** expanded with `viewAny`, `create`, `update`, `deactivateAdmin`, `resetPassword`, `deleteAdmin` methods.
+- **`User` model** updated: fillable, casts, `deleteSessions()` method, docblock for new columns.
+- **`UserFactory`** updated: defaults for new columns; `inactive()` and `mustChangePassword()` state methods.
+- **Middleware** `EnforceActiveUser`: logs out inactive authenticated users on each request (web group).
+- **Middleware** `EnforceMustChangePassword`: redirects `must_change_password` users to `/password/change` (exempt: profile, security, logout, Livewire).
+- **`RecordLastLogin` listener**: updates `last_login_at` on `Illuminate\Auth\Events\Login`.
+- **`ChangePassword` Livewire component** (`app/Livewire/Auth/ChangePassword.php`) + blade view.
+- **Registration disabled**: `Features::registration()` removed from `config/fortify.php`; `Fortify::registerView()` removed from `FortifyServiceProvider`; `Fortify::authenticateUsing()` added with inactive-user check.
+- **`RegistrationTest`** replaced with 2 tests asserting `/register` → 404.
+- **Livewire screen** `app/Livewire/Users/Index.php` at route `/admin/users` (`users.index`): search, role/status filters, table, create modal, edit modal, details panel, action buttons, password-reveal modal.
+- **Blade views** (`resources/views/livewire/users/`): `index.blade.php` + 5 partials (`table`, `form`, `details`, `delete-confirmation`, `password-reveal`).
+- **Routes**: `/admin/users` (`users.index`) and `/password/change` (`password.change`) added to `routes/web.php`.
+- **Sidebar**: "Administration" group now shows "Users" (requires `users.view`) and "Business settings" (requires `settings.view`).
+- **Permissions**: `users.view`, `users.create`, `users.update`, `users.deactivate`, `users.reset_password`, `users.delete`, `audit.view` added to `EnsureSystemRoles`. Admin gets all; other roles get none.
+- **Tests** (`tests/Feature/Users/UserManagementTest.php`): 20 tests — registration 404, create with role and audit log, privilege escalation, inactive login, session deletion on deactivate, last-Admin protection, self-protection, password reset, 2FA reset, delete with/without activity, reactivate, `last_login_at`, route auth (Admin 200 / others 403), audit log cleanliness.
+- **Docs**: `MODULES.md` §11 added; `ROUTING.md`, `SECURITY.md`, `TESTING.md` updated; `CHANGELOG.md` entry added.
+
 ## [Phase 6A: Reports] - 2026-11-06
 
 ### Added

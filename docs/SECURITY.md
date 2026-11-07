@@ -67,6 +67,27 @@ Each Livewire action calls `$this->authorize(...)` or `Gate::authorize(...)` as 
 
 - The system walk-in customer record (`is_walk_in = true`) cannot be edited, deleted, or duplicated through any path — policy, action validation, and seeder idempotency all enforce this.
 
+## User Management Security
+
+- **Registration disabled**: `Features::registration()` removed from `config/fortify.php`. `/register` returns 404.
+- **Inactive users**: `Fortify::authenticateUsing()` throws `ValidationException` before issuing a session. `EnforceActiveUser` middleware terminates active sessions if `is_active` changes to `false` mid-session.
+- **Forced password change**: `EnforceMustChangePassword` middleware redirects `must_change_password` users to `/password/change` (exempt: profile, security, logout, Livewire wire-requests). On successful change, `must_change_password` is cleared.
+- **Last active Admin protection**: `AdminAccountProtection::assertCanRemove()` refuses deactivation or deletion of the last active Admin. Counted with `is_active = true` filter.
+- **Self-protection**: `UserPolicy` methods `update`, `deactivateAdmin`, `resetPassword`, `deleteAdmin` reject `$actor->is($target)`.
+- **Privilege escalation**: `CreateUser` and `UpdateUser` validate that (a) only Admin can assign Admin role, (b) non-admins cannot assign roles whose permissions exceed their own.
+- **Sessions invalidated** on: deactivate, role change, password reset, 2FA reset.
+- **Temporary passwords** returned from `CreateUser`/`ResetUserPassword` as plain-text array element — shown once in UI, never logged, never stored plain.
+
+| Permission | Who holds it |
+|---|---|
+| `users.view` | Admin |
+| `users.create` | Admin |
+| `users.update` | Admin |
+| `users.deactivate` | Admin |
+| `users.reset_password` | Admin |
+| `users.delete` | Admin |
+| `audit.view` | Admin |
+
 ## Audit Trail
 
 | Event | Recorded fields |
@@ -75,3 +96,9 @@ Each Livewire action calls `$this->authorize(...)` or `Gate::authorize(...)` as 
 | Invoice voided | `voided_by`, `voided_at`, `void_reason` |
 | Payment recorded | `received_by`, `received_at`, `idempotency_key` |
 | Payment reversed | `reversed_by`, `reversed_at`, `reverse_reason` |
+| User created | `admin_audit_logs`: `actor_id`, `action=user.created`, name/email/roles (no password) |
+| User updated | `admin_audit_logs`: old and new name/email/roles |
+| User deactivated/reactivated | `admin_audit_logs` |
+| Password reset | `admin_audit_logs` (no password stored) |
+| 2FA reset | `admin_audit_logs` |
+| User deleted | `admin_audit_logs` before deletion |

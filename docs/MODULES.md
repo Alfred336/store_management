@@ -131,7 +131,29 @@
 - **Timezone**: Date boundaries use Africa/Dar_es_Salaam for `voided_at` and POS session `opened_at` date casting; `issue_date` and `received_at` are stored as dates (no TZ conversion needed).
 - **Permissions**: `reports.view` (Admin, Storekeeper, Viewer), `reports.export` (Admin only). Authorized in `mount()` and every export action.
 
-## 11. Settings & Document Sequences
+## 11. User Management (Phase 7A)
+
+- **Location**: `app/Livewire/Users/Index.php`, `app/Livewire/Actions/Users/`, `app/Models/AdminAuditLog.php`, `app/Policies/UserPolicy.php`, `app/Services/Authorization/AdminAccountProtection.php`
+- **Actions** (all in `app/Livewire/Actions/Users/`):
+  - `CreateUser`: Creates user with role(s), auto-generates or accepts a plain temporary password, sets `must_change_password = true`, writes audit log. Returns `['user', 'password']` — plain password shown once in UI.
+  - `UpdateUser`: Updates name, email, roles. Deletes sessions on role change. Validates privilege escalation.
+  - `DeactivateUser`: Locks active admins, checks last-admin rule, checks for open POS session, sets `is_active = false`, deletes sessions, writes audit log.
+  - `ReactivateUser`: Sets `is_active = true`, writes audit log.
+  - `ResetUserPassword`: Sets new hashed password (auto-generated or given), sets `must_change_password = true`, deletes sessions, writes audit log. Returns `['user', 'password']`.
+  - `ResetTwoFactor`: Clears `two_factor_secret`, `two_factor_recovery_codes`, `two_factor_confirmed_at`, deletes sessions, writes audit log.
+  - `DeleteUser`: Checks last-admin rule, refuses if user has any activity (invoices, payments, stock movements, POS sessions) with suggestion to deactivate instead, writes audit log, deletes sessions, deletes user.
+- **Screen** (`/admin/users`): search (ILIKE name/email), role filter, active/inactive filter, paginated table with last login and role badges, details panel with activity counts + recent audit log, action buttons per permission.
+- **Temporary password**: shown once in `password-reveal` modal after create or reset; never logged or stored plain.
+- **Permissions**: `users.view`, `users.create`, `users.update`, `users.deactivate`, `users.reset_password`, `users.delete`, `audit.view` — Admin gets all, other roles none.
+- **Middleware**:
+  - `EnforceActiveUser`: logs out inactive authenticated users on each request.
+  - `EnforceMustChangePassword`: redirects `must_change_password` users to `/password/change`.
+- **Login hooks**: `Fortify::authenticateUsing()` blocks inactive users. `RecordLastLogin` listener captures `last_login_at` on `Illuminate\Auth\Events\Login`.
+- **Registration disabled**: `Features::registration()` removed from `config/fortify.php`; `/register` returns 404.
+- **Audit log** (`admin_audit_logs`): every Action writes `actor_id`, `action`, `subject_type`, `subject_id`, `changes` (JSON, never includes passwords), `ip_address`, `created_at`.
+- **Safety rules**: cannot deactivate/delete/remove Admin from LAST active Admin; cannot act on own account (self-protection in `UserPolicy`); only Admin can assign Admin role; non-admin cannot assign roles with permissions they don't hold.
+
+## 12. Settings & Document Sequences
 
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:

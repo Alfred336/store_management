@@ -46,11 +46,16 @@
                         <flux:sidebar.item icon="x-circle" :href="route('reports.voided_invoices')" :current="request()->routeIs('reports.voided_invoices')" wire:navigate>Voided Invoices</flux:sidebar.item>
                     </flux:sidebar.group>
                 @endcan
-                @can('viewAny', App\Models\Setting::class)
+                @if(auth()->user()?->can('users.view') || auth()->user()?->can('viewAny', App\Models\Setting::class))
                     <flux:sidebar.group heading="Administration" class="grid">
-                        <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>Business settings</flux:sidebar.item>
+                        @can('users.view')
+                            <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>Users</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', App\Models\Setting::class)
+                            <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>Business settings</flux:sidebar.item>
+                        @endcan
                     </flux:sidebar.group>
-                @endcan
+                @endif
                 @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class) || auth()->user()?->can('viewAny', App\Models\Payment::class) || auth()->user()?->can('pos.use'))
                     <flux:sidebar.group heading="Sales" class="grid">
                         @can('pos.use')

@@ -5,7 +5,7 @@ namespace App\Services\Authorization;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
-/** Prevent removal of the final Admin account. */
+/** Prevent removal of the final active Admin account. */
 class AdminAccountProtection
 {
     private const ADMIN_ROLES = ['Admin'];
@@ -21,15 +21,18 @@ class AdminAccountProtection
             return false;
         }
 
+        // Only active admins count — inactive admins cannot perform admin tasks.
         return User::query()
+            ->where('is_active', true)
             ->whereHas('roles', fn ($query) => $query->whereIn('name', self::ADMIN_ROLES))
             ->count() <= 1;
     }
 
-    /** Lock all administrator rows so concurrent deletions cannot remove the final admin. */
+    /** Lock all active administrator rows so concurrent operations cannot remove the final admin. */
     public function lockAdmins(): int
     {
         $lockedAdmins = User::query()
+            ->where('is_active', true)
             ->whereHas('roles', fn ($query) => $query->whereIn('name', self::ADMIN_ROLES))
             ->orderBy('users.id')
             ->lockForUpdate()
@@ -42,14 +45,16 @@ class AdminAccountProtection
     {
         if ($this->isAdmin($user) && ($lockedAdminCount ?? $this->adminCount()) <= 1) {
             throw ValidationException::withMessages([
-                'account' => 'You cannot delete or deactivate the last Admin account. Assign Admin to another user first.',
+                'account' => 'You cannot delete or deactivate the last active Admin account. Assign Admin to another user first.',
             ]);
         }
     }
 
+    /** Count of currently active administrators. */
     public function adminCount(): int
     {
         return User::query()
+            ->where('is_active', true)
             ->whereHas('roles', fn ($query) => $query->whereIn('name', self::ADMIN_ROLES))
             ->count();
     }

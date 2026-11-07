@@ -138,7 +138,24 @@ Run code formatting and style fixes:
 - **Inventory Report**: Stock value = quantity × selling_price computed correctly.
 - **PDF endpoint**: 200 + `Content-Type: application/pdf` + `%PDF` prefix for `sales` and `inventory` slugs; 403 for cashier; 404 for unknown slug.
 
-### 9. POS Suite (`tests/Feature/Pos/PosModuleTest.php`)
+### 9. User Management Suite (`tests/Feature/Users/UserManagementTest.php`)
+
+- **Registration**: `/register` GET and POST return 404 (registration disabled).
+- **CreateUser**: Admin creates user with role; `must_change_password = true`; audit log written without password; non-admin cannot assign Admin role; at least one role required; duplicate email rejected.
+- **Login guards**: Inactive user POST to `/login` returns session errors and stays unauthenticated; active user logs in.
+- **Session invalidation**: Deactivating a user deletes their `sessions` rows immediately.
+- **Last Admin protection**: Deactivating or deleting the sole active Admin throws `ValidationException`; a second active Admin allows deactivation of the first.
+- **Self-protection**: Admin cannot update, reset password, or delete themselves via admin Actions.
+- **Privilege escalation**: Cashier cannot assign a role (Storekeeper) with permissions the Cashier does not hold.
+- **ResetUserPassword**: Generates a password, sets `must_change_password = true`, deletes sessions, writes audit log without password in `changes`.
+- **ResetTwoFactor**: Clears 2FA columns, deletes sessions, writes audit log.
+- **DeleteUser with activity**: Delete refused when user has invoice rows; deleted without activity.
+- **Reactivate**: Admin reactivates an inactive user; audit log written.
+- **last_login_at**: Recorded when `Illuminate\Auth\Events\Login` is dispatched.
+- **Route authorization**: Admin gets 200 on `/admin/users`; Cashier, Storekeeper, Viewer get 403.
+- **Audit log cleanliness**: `user.created` log `changes` never contains `password` key or plain text value.
+
+### 10. POS Suite (`tests/Feature/Pos/PosModuleTest.php`)
 
 - **Session Management**: Cashier opens a session; duplicate open session is blocked; closing computes `expected_cash` and `difference`; manager force-closes another user's session; non-owner without `pos.close_any_session` is blocked.
 - **Sale Completion**: `CompletePosSale` issues RCT-numbered invoice; uses `selling_price` as default unit price; records `amount_tendered` and `change_given` on cash payments; aggregates multiple tenders across separate `Payment` rows.

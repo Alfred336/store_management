@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\EnforceActiveUser;
+use App\Http\Middleware\EnforceMustChangePassword;
+use App\Listeners\RecordLastLogin;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Invoice;
@@ -23,11 +26,14 @@ use App\Policies\UserPolicy;
 use App\Services\Fiscal\FiscalProvider;
 use App\Services\Fiscal\NullFiscalProvider;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -45,6 +51,17 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        // Apply auth-enforcement middleware to Livewire wire-update calls so that
+        // deactivations and forced password changes take effect even mid-session.
+        // Livewire uses the signed snapshot memo path for the route check, so the
+        // exemptions in each middleware work correctly without relying on Referer.
+        Livewire::addPersistentMiddleware([
+            EnforceMustChangePassword::class,
+            EnforceActiveUser::class,
+        ]);
+
+        Event::listen(Login::class, RecordLastLogin::class);
 
         Gate::policy(Unit::class, UnitPolicy::class);
         Gate::policy(Category::class, CategoryPolicy::class);
