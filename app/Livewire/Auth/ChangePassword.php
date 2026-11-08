@@ -8,6 +8,7 @@ use App\Services\Auth\EmailVerificationService;
 use Closure;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -58,21 +59,40 @@ class ChangePassword extends Component
         /** @var User $user */
         $user = Auth::user();
 
+        // Admin-created users must verify their email after changing their temporary password.
+        // The password save and code creation must both succeed or both roll back — a mail
+        // failure must not leave the user with a changed password but no code to verify.
+        if ($user->email_verified_at === null) {
+            DB::beginTransaction();
+            try {
+                $user->forceFill([
+                    'password' => $validated['password'],
+                    'must_change_password' => false,
+                ])->save();
+
+                // sendCode() runs its own nested transaction (savepoint) then sends the mail.
+                // If Mail::send() throws, the exception propagates here, we roll back the
+                // outer transaction, and neither the password change nor the code record persist.
+                app(EmailVerificationService::class)->sendCode($user);
+
+                DB::commit();
+            } catch (\Throwable) {
+                DB::rollBack();
+                $this->addError('password', 'Could not send the verification email. Please try again or contact your administrator.');
+
+                return;
+            }
+
+            $this->redirect(route('verification.code'), navigate: true);
+
+            return;
+        }
+
+        // Already-verified path (e.g. admin password-reset where email stays verified).
         $user->forceFill([
             'password' => $validated['password'],
             'must_change_password' => false,
         ])->save();
-
-        $this->reset('current_password', 'password', 'password_confirmation');
-
-        // If the user's email is not yet verified (admin-created account path),
-        // send them a 6-digit code and redirect to the verification screen.
-        if ($user->fresh()->email_verified_at === null) {
-            app(EmailVerificationService::class)->sendCode($user->fresh());
-            $this->redirect(route('verification.notice'), navigate: true);
-
-            return;
-        }
 
         Flux::toast(variant: 'success', text: 'Password updated successfully.');
 

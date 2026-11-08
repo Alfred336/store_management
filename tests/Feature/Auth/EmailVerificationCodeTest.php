@@ -10,6 +10,7 @@ use App\Models\EmailVerificationCode;
 use App\Models\User;
 use App\Services\Auth\EmailVerificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
@@ -168,7 +169,7 @@ test('verify-code page is accessible for unverified user with password already c
     $user = unverifiedUser();
     $this->actingAs($user);
 
-    $this->get(route('verification.notice'))->assertOk();
+    $this->get(route('verification.code'))->assertOk();
 });
 
 test('verified user is redirected to dashboard from verify-code page', function (): void {
@@ -269,7 +270,14 @@ test('logout from verify-code page ends session', function (): void {
 
 // ─── ChangePassword flow integration ─────────────────────────────────────────
 
-test('changing password when email is unverified sends a code and redirects to verify-code', function (): void {
+test('route verification.code resolves to email/verify-code not email/verify', function (): void {
+    // Regression: Fortify registers its own verification.notice → /email/verify after
+    // routes/web.php is loaded, overwriting our name. Our route must use a distinct name.
+    expect(route('verification.code'))->toEndWith('/email/verify-code');
+    expect(route('verification.code'))->not->toEndWith('/email/verify');
+});
+
+test('changing password when email is unverified sends exactly one code and redirects to verify-code', function (): void {
     Mail::fake();
 
     $user = User::factory()->unverified()->create(['must_change_password' => true]);
@@ -281,8 +289,9 @@ test('changing password when email is unverified sends a code and redirects to v
         ->set('password_confirmation', 'NewSecure!123')
         ->call('updatePassword')
         ->assertHasNoErrors()
-        ->assertRedirect(route('verification.notice'));
+        ->assertRedirect(route('verification.code'));
 
+    Mail::assertSent(VerificationCodeMail::class, 1);
     Mail::assertSent(VerificationCodeMail::class, fn ($m) => $m->hasTo($user->email));
     expect($user->fresh()->must_change_password)->toBeFalse();
     expect($user->fresh()->email_verified_at)->toBeNull();
@@ -302,13 +311,100 @@ test('changing password when email is already verified redirects to dashboard', 
         ->assertRedirect(route('dashboard'));
 });
 
+test('if sending the verification email fails the password change is rolled back', function (): void {
+    // Force sendCode() to throw at the mail step.
+    $this->mock(EmailVerificationService::class)
+        ->shouldReceive('sendCode')
+        ->once()
+        ->andThrow(new RuntimeException('SMTP not reachable'));
+
+    $user = User::factory()->unverified()->create(['must_change_password' => true]);
+    $this->actingAs($user);
+
+    Livewire::test(ChangePassword::class)
+        ->set('current_password', 'password')
+        ->set('password', 'NewSecure!123')
+        ->set('password_confirmation', 'NewSecure!123')
+        ->call('updatePassword')
+        ->assertHasErrors(['password']); // clear error shown on the form
+
+    // Password must NOT have changed and must_change_password must still be true.
+    expect($user->fresh()->must_change_password)->toBeTrue();
+    expect(Hash::check('NewSecure!123', $user->fresh()->password))->toBeFalse();
+    expect(Hash::check('password', $user->fresh()->password))->toBeTrue();
+});
+
+test('user stays authenticated on the current session after changing password', function (): void {
+    Mail::fake();
+
+    $user = User::factory()->unverified()->create(['must_change_password' => true]);
+    $this->actingAs($user);
+
+    Livewire::test(ChangePassword::class)
+        ->set('current_password', 'password')
+        ->set('password', 'NewSecure!123')
+        ->set('password_confirmation', 'NewSecure!123')
+        ->call('updatePassword')
+        ->assertHasNoErrors();
+
+    // The current session must still be authenticated — not logged out.
+    $this->assertAuthenticatedAs($user);
+
+    // And the verify-code route is accessible (not redirected to login).
+    $this->get(route('verification.code'))->assertOk();
+});
+
+test('full onboarding flow: password change then code verification reaches dashboard', function (): void {
+    Mail::fake();
+
+    app(EnsureSystemRoles::class)();
+    $user = User::factory()->unverified()->create(['must_change_password' => true]);
+    $user->assignRole('Cashier'); // needs a role to pass the dashboard policy
+    $this->actingAs($user);
+
+    // Step 1: change the temporary password.
+    Livewire::test(ChangePassword::class)
+        ->set('current_password', 'password')
+        ->set('password', 'NewSecure!123')
+        ->set('password_confirmation', 'NewSecure!123')
+        ->call('updatePassword')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('verification.code'));
+
+    expect($user->fresh()->must_change_password)->toBeFalse();
+    expect($user->fresh()->email_verified_at)->toBeNull();
+
+    // Capture the plain code from the mailable (the DB only stores it hashed).
+    $sentPlain = null;
+    Mail::assertSent(VerificationCodeMail::class, function (VerificationCodeMail $m) use (&$sentPlain) {
+        $sentPlain = $m->code;
+
+        return true;
+    });
+
+    // Step 2: visiting /email/verify-code must NOT redirect back to /password/change.
+    $this->get(route('verification.code'))->assertOk();
+
+    // Step 3: submit the correct code.
+    Livewire::test(VerifyEmailCode::class)
+        ->set('code', $sentPlain)
+        ->call('verify')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('dashboard'));
+
+    expect($user->fresh()->email_verified_at)->not->toBeNull();
+
+    // Step 4: the dashboard is now accessible (fully verified).
+    $this->get(route('dashboard'))->assertOk();
+});
+
 // ─── Routing — no redirect loop ───────────────────────────────────────────────
 
 test('password.change route is accessible without email verification', function (): void {
     $user = User::factory()->unverified()->create(['must_change_password' => true]);
     $this->actingAs($user);
 
-    // Must NOT be redirected to verification.notice — that would be a loop.
+    // Must NOT be redirected to verification.code — that would be a loop.
     $this->get(route('password.change'))->assertOk();
 });
 
@@ -316,14 +412,14 @@ test('verify-code route is accessible without email verification', function (): 
     $user = unverifiedUser();
     $this->actingAs($user);
 
-    $this->get(route('verification.notice'))->assertOk();
+    $this->get(route('verification.code'))->assertOk();
 });
 
-test('dashboard redirects unverified user to verification.notice', function (): void {
+test('dashboard redirects unverified user to verification.code', function (): void {
     $user = unverifiedUser();
     $this->actingAs($user);
 
-    $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
+    $this->get(route('dashboard'))->assertRedirect(route('verification.code'));
 });
 
 // ─── ResetUserPassword deletes pending codes ─────────────────────────────────

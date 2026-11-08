@@ -42,11 +42,14 @@ Route::livewire('setup', SetupIndex::class)->name('setup.index');
 Route::middleware(['auth'])->group(function (): void {
     Route::livewire('password/change', ChangePassword::class)->name('password.change');
 
-    // This route name is the target of Laravel's EnsureEmailIsVerified middleware.
-    Route::livewire('email/verify-code', VerifyEmailCode::class)->name('verification.notice');
+    // Named 'verification.code' (NOT 'verification.notice') to avoid being overwritten
+    // by Fortify, whose FortifyServiceProvider boots after routes/web.php is loaded and
+    // would re-register 'verification.notice' → /email/verify (the click-link page).
+    // All 'verified' middleware declarations pass this name explicitly: verified:verification.code
+    Route::livewire('email/verify-code', VerifyEmailCode::class)->name('verification.code');
 });
 
-Route::middleware(['auth', 'verified'])->group(function (): void {
+Route::middleware(['auth', 'verified:verification.code'])->group(function (): void {
     // Dashboard.
     Route::livewire('dashboard', DashboardIndex::class)->name('dashboard');
 
