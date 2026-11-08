@@ -18,6 +18,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
@@ -30,6 +31,7 @@ class Index extends Component
 
     // ─── Filters ────────────────────────────────────────────────────────────
 
+    #[Url(as: 'q')]
     public string $search = '';
 
     public string $roleFilter = '';
@@ -73,6 +75,13 @@ class Index extends Component
     public function updatedSearch(): void
     {
         abort_unless(auth()->user()?->can('users.view'), 403);
+        $this->resetPage();
+    }
+
+    public function clearSearch(): void
+    {
+        abort_unless(auth()->user()?->can('users.view'), 403);
+        $this->search = '';
         $this->resetPage();
     }
 
@@ -285,7 +294,7 @@ class Index extends Component
             ->orderBy('name')
             ->paginate(20);
 
-        $roles = Role::orderBy('name')->pluck('name')->all();
+        $availableRoles = Role::orderBy('name')->pluck('name')->all();
 
         $selectedUser = null;
         $activityCounts = [];
@@ -305,7 +314,7 @@ class Index extends Component
             }
         }
 
-        return view('livewire.users.index', compact('users', 'roles', 'selectedUser', 'activityCounts', 'recentAudit'));
+        return view('livewire.users.index', compact('users', 'availableRoles', 'selectedUser', 'activityCounts', 'recentAudit'));
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

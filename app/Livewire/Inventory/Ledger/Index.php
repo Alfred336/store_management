@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\View\View;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -18,6 +19,7 @@ class Index extends Component
 {
     use WithPagination;
 
+    #[Url(as: 'q')]
     public string $search = '';
 
     public string $productFilter = '';
@@ -39,6 +41,12 @@ class Index extends Component
 
     public function updatedSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function clearSearch(): void
+    {
+        $this->search = '';
         $this->resetPage();
     }
 

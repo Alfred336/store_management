@@ -3,6 +3,8 @@
 namespace App\Livewire\Auth;
 
 use App\Concerns\PasswordValidationRules;
+use App\Models\User;
+use App\Services\Auth\EmailVerificationService;
 use Closure;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
@@ -53,12 +55,24 @@ class ChangePassword extends Component
             throw $e;
         }
 
-        Auth::user()->forceFill([
+        /** @var User $user */
+        $user = Auth::user();
+
+        $user->forceFill([
             'password' => $validated['password'],
             'must_change_password' => false,
         ])->save();
 
         $this->reset('current_password', 'password', 'password_confirmation');
+
+        // If the user's email is not yet verified (admin-created account path),
+        // send them a 6-digit code and redirect to the verification screen.
+        if ($user->fresh()->email_verified_at === null) {
+            app(EmailVerificationService::class)->sendCode($user->fresh());
+            $this->redirect(route('verification.notice'), navigate: true);
+
+            return;
+        }
 
         Flux::toast(variant: 'success', text: 'Password updated successfully.');
 

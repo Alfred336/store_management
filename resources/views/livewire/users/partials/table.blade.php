@@ -30,13 +30,14 @@
                         {{ $user->last_login_at ? $user->last_login_at->diffForHumans() : '—' }}
                     </td>
                     <td class="px-4 py-3">
-                        @if ($user->is_active)
-                            <flux:badge color="green" size="sm">Active</flux:badge>
-                        @else
+                        @if (! $user->is_active)
                             <flux:badge color="red" size="sm">Inactive</flux:badge>
-                        @endif
-                        @if ($user->must_change_password)
-                            <flux:badge color="yellow" size="sm" class="ml-1">Pwd reset</flux:badge>
+                        @elseif ($user->must_change_password)
+                            <flux:badge color="yellow" size="sm">Pending password change</flux:badge>
+                        @elseif ($user->email_verified_at === null)
+                            <flux:badge color="orange" size="sm">Pending email verification</flux:badge>
+                        @else
+                            <flux:badge color="green" size="sm">Active</flux:badge>
                         @endif
                     </td>
                     <td class="px-4 py-3">

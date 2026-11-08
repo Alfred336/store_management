@@ -1,5 +1,25 @@
 # Changelog
 
+## [Phase 7B: Email Verification Code Flow] - 2026-11-08
+
+### Added
+
+- **Migration** `2026_11_08_000001_create_email_verification_codes_table.php`: `email_verification_codes (id, user_id FK cascade, code_hash varchar 64, expires_at, attempts smallint, used_at nullable, created_at)` with index on `user_id`.
+- **`EmailVerificationCode` model** (`app/Models/EmailVerificationCode.php`): `$timestamps = false`; casts for `expires_at`, `used_at`, `created_at`; `user()` relation.
+- **`EmailVerificationService`** (`app/Services/Auth/EmailVerificationService.php`): `sendCode()` (generates 6-digit code, hashes HMAC-SHA256, invalidates old codes, sends mail synchronously), `verifyCode()` (atomic verify inside transaction), `activeCode()`, `canResend()`, `resendAvailableIn()`, `recordResend()`, `deletePendingCodes()`.
+- **`VerificationCodeMail`** (`app/Mail/VerificationCodeMail.php`) + views (`resources/views/mail/verification-code.blade.php`, `verification-code-text.blade.php`): HTML + plain-text email showing the 6-digit code with expiry notice.
+- **`VerifyEmailCode` Livewire component** (`app/Livewire/Auth/VerifyEmailCode.php`) at route `/email/verify-code` (`verification.notice`): `verify()`, `resend()`, `logout()` with per-user+IP rate-limit on submission.
+- **Blade view** `resources/views/livewire/auth/verify-email-code.blade.php`: masked email hint, digit input, resend cooldown countdown, logout link.
+
+### Changed
+
+- **`ChangePassword`**: after a successful password change, if `email_verified_at = null` a fresh code is sent and the user is redirected to `verification.notice`; otherwise redirects to dashboard.
+- **`routes/web.php`**: `password.change` and `email/verify-code` moved to an `auth`-only group (removed from `auth,verified`) to prevent redirect loops for admin-created users.
+- **`ResetUserPassword` action**: calls `EmailVerificationService::deletePendingCodes()` after resetting — email stays verified, stale pending codes are cleared.
+- **`DeactivateUser` action**: calls `EmailVerificationService::deletePendingCodes()` on deactivation.
+- **Users table** (`resources/views/livewire/users/partials/table.blade.php`): status column now shows four distinct badges — Inactive (red), Pending password change (yellow), Pending email verification (orange), Active (green).
+- **`docs/ROUTING.md`**, **`docs/SECURITY.md`**, **`docs/TESTING.md`** updated.
+
 ## [Phase 7A: User Management] - 2026-11-06
 
 ### Added

@@ -9,7 +9,7 @@
             <div>
                 <flux:label>Roles</flux:label>
                 <div class="mt-2 space-y-2">
-                    @foreach ($roles as $role)
+                    @foreach ($availableRoles as $role)
                         <label class="flex items-center gap-2 text-sm">
                             <input type="checkbox" wire:model="roles" value="{{ $role }}"
                                    class="rounded border-zinc-300 dark:border-zinc-600" />

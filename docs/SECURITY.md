@@ -72,6 +72,15 @@ Each Livewire action calls `$this->authorize(...)` or `Gate::authorize(...)` as 
 - **Registration disabled**: `Features::registration()` removed from `config/fortify.php`. `/register` returns 404.
 - **Inactive users**: `Fortify::authenticateUsing()` throws `ValidationException` before issuing a session. `EnforceActiveUser` middleware terminates active sessions if `is_active` changes to `false` mid-session.
 - **Forced password change**: `EnforceMustChangePassword` middleware redirects `must_change_password` users to `/password/change` (exempt: profile, security, logout, Livewire wire-requests). On successful change, `must_change_password` is cleared.
+- **Email verification code flow**: Admin-created users receive a temporary password, must change it on first login, then verify their email via a 6-digit code (not a click-link). The code is stored HMAC-SHA256 hashed, expires in 15 minutes, is invalidated after 5 wrong attempts, and resend is throttled to once per 60 seconds. After verification `email_verified_at` is set and the user reaches the dashboard. The `password.change` and `email/verify-code` routes sit in an `auth`-only group (not `auth,verified`) to prevent redirect loops.
+- **Redirect decision table** (admin-created user, first login):
+
+| `must_change_password` | `email_verified_at` | Middleware result |
+|---|---|---|
+| `true` | `null` | `EnforceMustChangePassword` → `/password/change` |
+| `false` | `null` | `EnsureEmailIsVerified` → `/email/verify-code` |
+| `false` | set | No redirect — user proceeds normally |
+
 - **Last active Admin protection**: `AdminAccountProtection::assertCanRemove()` refuses deactivation or deletion of the last active Admin. Counted with `is_active = true` filter.
 - **Self-protection**: `UserPolicy` methods `update`, `deactivateAdmin`, `resetPassword`, `deleteAdmin` reject `$actor->is($target)`.
 - **Privilege escalation**: `CreateUser` and `UpdateUser` validate that (a) only Admin can assign Admin role, (b) non-admins cannot assign roles whose permissions exceed their own.

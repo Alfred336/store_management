@@ -155,7 +155,15 @@ Run code formatting and style fixes:
 - **Route authorization**: Admin gets 200 on `/admin/users`; Cashier, Storekeeper, Viewer get 403.
 - **Audit log cleanliness**: `user.created` log `changes` never contains `password` key or plain text value.
 
-### 10. POS Suite (`tests/Feature/Pos/PosModuleTest.php`)
+### 10. Email Verification Code Suite (`tests/Feature/Auth/EmailVerificationCodeTest.php`)
+
+- **`EmailVerificationService`**: `sendCode` stores a hashed code, sends mail, invalidates previous pending codes; `verifyCode` returns `true` on correct code and sets `email_verified_at`; returns `false` on wrong code and increments attempts; returns `false` when attempts are exhausted (5 wrong); returns `false` for expired codes; resend rate-limiting enforced; `deletePendingCodes` removes unused codes.
+- **`VerifyEmailCode` component**: accessible for unverified user; verified user redirected to dashboard; `must_change_password` user redirected to password-change; correct code verifies email and redirects; wrong code shows generic error; non-digits fail validation; `resend()` sends new code when cooldown elapsed; `resend()` sets cooldown when too soon; `logout()` ends session.
+- **`ChangePassword` integration**: unverified email after password change triggers code send and redirect to `verification.notice`; already-verified email redirects to dashboard.
+- **Routing**: `password.change` accessible without email verification (no loop); `verification.notice` accessible without email verification; dashboard redirects unverified user to `verification.notice`.
+- **Action side-effects**: `ResetUserPassword` deletes pending codes; `DeactivateUser` deletes pending codes.
+
+### 11. POS Suite (`tests/Feature/Pos/PosModuleTest.php`)
 
 - **Session Management**: Cashier opens a session; duplicate open session is blocked; closing computes `expected_cash` and `difference`; manager force-closes another user's session; non-owner without `pos.close_any_session` is blocked.
 - **Sale Completion**: `CompletePosSale` issues RCT-numbered invoice; uses `selling_price` as default unit price; records `amount_tendered` and `change_given` on cash payments; aggregates multiple tenders across separate `Payment` rows.

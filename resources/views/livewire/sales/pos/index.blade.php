@@ -32,6 +32,7 @@
                     wire:model.live.debounce.200ms="productSearch"
                     placeholder="Search by name, SKU or barcode…"
                     icon="magnifying-glass"
+                    autocomplete="off"
                     autofocus
                 />
 

@@ -648,6 +648,21 @@ test('thermal_receipt_renders_a_pdf', function (): void {
     expect(substr($response->getContent(), 0, 4))->toBe('%PDF');
 });
 
+// ─── Product search clears after addToCart (Bug 2 regression) ────────────────
+
+test('product_search_is_empty_after_adding_item_to_cart', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $product = posProduct($location);
+    posSession($user, $location);
+
+    Livewire::actingAs($user)->test(PosIndex::class)
+        ->set('productSearch', $product->name)
+        ->assertSet('productSearch', $product->name)
+        ->call('addToCart', $product->id)
+        ->assertSet('productSearch', '');
+});
+
 // ─── 24. Packaging unit: carton price = selling_price × factor ───────────────
 
 test('carton_line_uses_selling_price_times_factor_and_ignores_tampered_price', function (): void {

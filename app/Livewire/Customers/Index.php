@@ -14,6 +14,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -26,6 +27,7 @@ class Index extends Component
     use WithFileUploads;
     use WithPagination;
 
+    #[Url(as: 'q')]
     public string $search = '';
 
     public string $typeFilter = 'all';
@@ -77,6 +79,13 @@ class Index extends Component
     public function updatedSearch(): void
     {
         $this->authorize('viewAny', Customer::class);
+        $this->resetPage();
+    }
+
+    public function clearSearch(): void
+    {
+        $this->authorize('viewAny', Customer::class);
+        $this->search = '';
         $this->resetPage();
     }
 

@@ -26,6 +26,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -36,6 +37,7 @@ class Index extends Component
     use WithPagination;
 
     // ─── List filters & sorting ───────────────────────────────────────────
+    #[Url(as: 'q')]
     public string $search = '';
 
     public string $statusFilter = 'all';
@@ -131,6 +133,13 @@ class Index extends Component
     public function updatedSearch(): void
     {
         $this->authorize('viewAny', Invoice::class);
+        $this->resetPage();
+    }
+
+    public function clearSearch(): void
+    {
+        $this->authorize('viewAny', Invoice::class);
+        $this->search = '';
         $this->resetPage();
     }
 

@@ -11,7 +11,7 @@
 
     {{-- Filters --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <flux:input wire:model.live.debounce.300ms="search" label="Search" placeholder="Number, customer or reference" icon="magnifying-glass" />
+        <x-search-input label="Search" placeholder="Number, customer or reference" :current-value="$search" />
         <flux:select wire:model.live="methodFilter" label="Method">
             <option value="all">All methods</option>
             <option value="cash">Cash</option>

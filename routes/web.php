@@ -6,6 +6,7 @@ use App\Http\Controllers\InvoicePdfController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\Reports\ReportPdfController;
 use App\Livewire\Auth\ChangePassword;
+use App\Livewire\Auth\VerifyEmailCode;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Livewire\Dashboard\Index as DashboardIndex;
@@ -33,6 +34,17 @@ Route::redirect('/', '/login')->name('home');
 
 // Initial setup: deliberately outside the authenticated route group.
 Route::livewire('setup', SetupIndex::class)->name('setup.index');
+
+// Routes that require authentication but NOT email verification.
+// password.change and email/verify-code must not sit inside the 'verified'
+// middleware group — doing so would create an infinite redirect loop for
+// admin-created users who have must_change_password=true + email_verified_at=null.
+Route::middleware(['auth'])->group(function (): void {
+    Route::livewire('password/change', ChangePassword::class)->name('password.change');
+
+    // This route name is the target of Laravel's EnsureEmailIsVerified middleware.
+    Route::livewire('email/verify-code', VerifyEmailCode::class)->name('verification.notice');
+});
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     // Dashboard.
@@ -70,9 +82,6 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     // Administration: user management.
     Route::livewire('admin/users', UsersIndex::class)->name('users.index');
-
-    // Forced password change (exempt from password.confirm).
-    Route::livewire('password/change', ChangePassword::class)->name('password.change');
 
     // Reports: view screens and PDF export.
     Route::livewire('reports/sales', ReportSalesIndex::class)->name('reports.sales');

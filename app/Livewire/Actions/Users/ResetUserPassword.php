@@ -4,6 +4,7 @@ namespace App\Livewire\Actions\Users;
 
 use App\Models\AdminAuditLog;
 use App\Models\User;
+use App\Services\Auth\EmailVerificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
@@ -36,6 +37,11 @@ class ResetUserPassword
 
             // Invalidate all existing sessions so the new password takes effect immediately.
             $target->deleteSessions();
+
+            // Delete pending verification codes — the user will get a fresh code
+            // after they change their password.  email_verified_at is NOT cleared;
+            // an already-verified email stays verified after an admin reset.
+            app(EmailVerificationService::class)->deletePendingCodes($target);
 
             AdminAuditLog::record('user.password_reset', User::class, $target->id);
 

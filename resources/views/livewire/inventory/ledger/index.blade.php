@@ -6,7 +6,7 @@
 
     {{-- Filters --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <flux:input wire:model.live.debounce.300ms="search" label="Search product" placeholder="Name or SKU" />
+        <x-search-input label="Search product" placeholder="Name or SKU" :current-value="$search" />
         <flux:select wire:model.live="productFilter" label="Product">
             <option value="">All products</option>
             @foreach ($products as $p)

@@ -11,7 +11,7 @@
 
     {{-- Filters --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <flux:input wire:model.live.debounce.300ms="search" label="Search" placeholder="Name, SKU, barcode" />
+        <x-search-input label="Search" placeholder="Name, SKU, barcode" :current-value="$search" />
         <flux:select wire:model.live="locationFilter" label="Location">
             <option value="">All locations</option>
             @foreach ($locations as $loc)

@@ -268,3 +268,23 @@ test('viewers are forbidden from creating updating or deleting inventory records
     Livewire::actingAs($viewer)->test($componentClass)->call('openForm', $record->id)->assertStatus(403);
     Livewire::actingAs($viewer)->test($componentClass)->call('confirmDelete', $record->id)->assertStatus(403);
 })->with('viewer denied inventory writes');
+
+// ─── Search persistence (Bug 2 regression) ───────────────────────────────────
+
+test('list component initialises with an empty search when no query string is present', function (): void {
+    $user = userWithInventoryPermissions(['units.view']);
+
+    Livewire::actingAs($user)->test(UnitsIndex::class)
+        ->assertSet('search', '');
+});
+
+test('clearSearch resets the search term and pagination to page one', function (): void {
+    $user = userWithInventoryPermissions(['units.view']);
+    Unit::factory()->count(5)->create();
+
+    Livewire::actingAs($user)->test(UnitsIndex::class)
+        ->set('search', 'something')
+        ->assertSet('search', 'something')
+        ->call('clearSearch')
+        ->assertSet('search', '');
+});

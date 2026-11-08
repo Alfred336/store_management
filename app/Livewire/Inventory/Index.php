@@ -17,6 +17,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -28,6 +29,7 @@ class Index extends Component
 
     // ─── Filters ──────────────────────────────────────────────────────────
 
+    #[Url(as: 'q')]
     public string $search = '';
 
     public string $locationFilter = '';
@@ -108,6 +110,12 @@ class Index extends Component
 
     public function updatedSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function clearSearch(): void
+    {
+        $this->search = '';
         $this->resetPage();
     }
 

@@ -24,7 +24,7 @@
     @endcan
 
     <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_12rem_12rem]">
-        <flux:input wire:model.live.debounce.300ms="search" label="Search customers" placeholder="Name, code, phone or email" />
+        <x-search-input label="Search customers" placeholder="Name, code, phone or email" :current-value="$search" />
         <flux:select wire:model.live="typeFilter" label="Customer type">
             <option value="all">All types</option><option value="individual">Individual</option><option value="business">Business</option>
         </flux:select>

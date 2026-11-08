@@ -10,10 +10,10 @@
     </div>
 
     <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_12rem_12rem]">
-        <flux:input wire:model.live.debounce.300ms="search" label="Search" placeholder="Name or email" />
+        <x-search-input label="Search" placeholder="Name or email" :current-value="$search" />
         <flux:select wire:model.live="roleFilter" label="Role">
             <option value="">All roles</option>
-            @foreach ($roles as $role)
+            @foreach ($availableRoles as $role)
                 <option value="{{ $role }}">{{ $role }}</option>
             @endforeach
         </flux:select>

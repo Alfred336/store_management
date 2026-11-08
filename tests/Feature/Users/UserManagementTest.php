@@ -8,6 +8,7 @@ use App\Livewire\Actions\Users\ReactivateUser;
 use App\Livewire\Actions\Users\ResetTwoFactor;
 use App\Livewire\Actions\Users\ResetUserPassword;
 use App\Livewire\Actions\Users\UpdateUser;
+use App\Livewire\Users\Index as UsersIndex;
 use App\Models\AdminAuditLog;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 
 uses(RefreshDatabase::class);
@@ -467,4 +469,47 @@ test('EnforceActiveUser also blocks a Livewire wire call from a deactivated user
     // wire calls, so a deactivated user cannot interact with any Livewire component.
     $this->post(route('default-livewire.update'))->assertRedirect(route('login'));
     $this->assertGuest();
+});
+
+// ─── Users Index Livewire component: role checkboxes ─────────────────────────
+
+test('create form renders one checkbox for every available role', function (): void {
+    $admin = adminUser(); // creates Admin, Storekeeper, Cashier, Viewer roles
+    $this->actingAs($admin);
+
+    Livewire::test(UsersIndex::class)
+        ->call('openCreate')
+        ->assertSee('Admin')
+        ->assertSee('Storekeeper')
+        ->assertSee('Cashier')
+        ->assertSee('Viewer');
+});
+
+test('admin creates a user via the component and user gets role and must_change_password', function (): void {
+    $admin = adminUser();
+    $this->actingAs($admin);
+
+    Livewire::test(UsersIndex::class)
+        ->set('name', 'New User')
+        ->set('email', 'newuser@example.com')
+        ->set('roles', ['Cashier'])
+        ->call('store')
+        ->assertHasNoErrors();
+
+    $user = User::where('email', 'newuser@example.com')->first();
+    expect($user)->not->toBeNull();
+    expect($user->must_change_password)->toBeTrue();
+    expect($user->hasRole('Cashier'))->toBeTrue();
+});
+
+test('submitting create form without a role shows roles validation error', function (): void {
+    $admin = adminUser();
+    $this->actingAs($admin);
+
+    Livewire::test(UsersIndex::class)
+        ->set('name', 'No Role User')
+        ->set('email', 'norole@example.com')
+        ->set('roles', [])
+        ->call('store')
+        ->assertHasErrors(['roles']);
 });

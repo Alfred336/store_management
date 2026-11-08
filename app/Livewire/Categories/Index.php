@@ -12,6 +12,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -21,6 +22,7 @@ class Index extends Component
 {
     use WithPagination;
 
+    #[Url(as: 'q')]
     public string $search = '';
 
     public string $sortBy = 'name';
@@ -41,6 +43,12 @@ class Index extends Component
     /** Reset pagination when the category search term changes. */
     public function updatedSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function clearSearch(): void
+    {
+        $this->search = '';
         $this->resetPage();
     }
 
