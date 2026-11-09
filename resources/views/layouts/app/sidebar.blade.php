@@ -11,64 +11,88 @@
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
-                <flux:sidebar.group :heading="__('Platform')" class="grid">
-                    <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
-                        {{ __('Dashboard') }}
-                    </flux:sidebar.item>
-                </flux:sidebar.group>
+                {{-- Dashboard --}}
+                <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
+                    {{ __('Dashboard') }}
+                </flux:sidebar.item>
 
-                <flux:sidebar.group heading="Inventory" class="grid">
-                    @can('inventory.view')
-                        <flux:sidebar.item icon="archive-box" :href="route('inventory.index')" :current="request()->routeIs('inventory.index')" wire:navigate>Stock on Hand</flux:sidebar.item>
-                        <flux:sidebar.item icon="clipboard-document-list" :href="route('inventory.ledger')" :current="request()->routeIs('inventory.ledger')" wire:navigate>Stock Ledger</flux:sidebar.item>
-                    @endcan
-                    @can('viewAny', App\Models\Product::class)
-                        <flux:sidebar.item icon="cube" :href="route('products.index')" :current="request()->routeIs('products.*')" wire:navigate>Products</flux:sidebar.item>
-                    @endcan
-                    @can('viewAny', App\Models\Category::class)
-                        <flux:sidebar.item icon="tag" :href="route('categories.index')" :current="request()->routeIs('categories.*')" wire:navigate>Categories</flux:sidebar.item>
-                    @endcan
-                    @can('viewAny', App\Models\Unit::class)
-                        <flux:sidebar.item icon="scale" :href="route('units.index')" :current="request()->routeIs('units.*')" wire:navigate>Units</flux:sidebar.item>
-                    @endcan
-                    @can('viewAny', App\Models\Location::class)
-                        <flux:sidebar.item icon="map-pin" :href="route('locations.index')" :current="request()->routeIs('locations.*')" wire:navigate>Locations</flux:sidebar.item>
-                    @endcan
-                </flux:sidebar.group>
-                @can('reports.view')
-                    <flux:sidebar.group heading="Reports" class="grid">
-                        <flux:sidebar.item icon="chart-bar" :href="route('reports.sales')" :current="request()->routeIs('reports.sales')" wire:navigate>Sales Summary</flux:sidebar.item>
-                        <flux:sidebar.item icon="document-chart-bar" :href="route('reports.vat')" :current="request()->routeIs('reports.vat')" wire:navigate>VAT Summary</flux:sidebar.item>
-                        <flux:sidebar.item icon="clock" :href="route('reports.receivables')" :current="request()->routeIs('reports.receivables')" wire:navigate>Receivables Aging</flux:sidebar.item>
-                        <flux:sidebar.item icon="banknotes" :href="route('reports.payments')" :current="request()->routeIs('reports.payments')" wire:navigate>Payments by Method</flux:sidebar.item>
-                        <flux:sidebar.item icon="computer-desktop" :href="route('reports.pos_sessions')" :current="request()->routeIs('reports.pos_sessions')" wire:navigate>POS Sessions</flux:sidebar.item>
-                        <flux:sidebar.item icon="archive-box" :href="route('reports.inventory')" :current="request()->routeIs('reports.inventory')" wire:navigate>Inventory</flux:sidebar.item>
-                        <flux:sidebar.item icon="x-circle" :href="route('reports.voided_invoices')" :current="request()->routeIs('reports.voided_invoices')" wire:navigate>Voided Invoices</flux:sidebar.item>
-                    </flux:sidebar.group>
-                @endcan
-                @if(auth()->user()?->can('users.view') || auth()->user()?->can('viewAny', App\Models\Setting::class))
-                    <flux:sidebar.group heading="Administration" class="grid">
-                        @can('users.view')
-                            <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>Users</flux:sidebar.item>
+                {{-- Sales --}}
+                @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class) || auth()->user()?->can('viewAny', App\Models\Payment::class) || auth()->user()?->can('pos.use'))
+                    <flux:sidebar.group
+                        heading="{{ __('Sales') }}"
+                        :expandable="true"
+                        :expanded="request()->routeIs('pos.*', 'invoices.*', 'payments.*', 'customers.*')"
+                    >
+                        @can('pos.use')
+                            <flux:sidebar.item icon="computer-desktop" :href="route('pos.index')" :current="request()->routeIs('pos.*')" wire:navigate>{{ __('Point of Sale') }}</flux:sidebar.item>
                         @endcan
-                        @can('viewAny', App\Models\Setting::class)
-                            <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>Business settings</flux:sidebar.item>
+                        @can('viewAny', App\Models\Invoice::class)
+                            <flux:sidebar.item icon="document-text" :href="route('invoices.index')" :current="request()->routeIs('invoices.*')" wire:navigate>{{ __('Invoices') }}</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', App\Models\Payment::class)
+                            <flux:sidebar.item icon="banknotes" :href="route('payments.index')" :current="request()->routeIs('payments.*')" wire:navigate>{{ __('Payments') }}</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', App\Models\Customer::class)
+                            <flux:sidebar.item icon="users" :href="route('customers.index')" :current="request()->routeIs('customers.*')" wire:navigate>{{ __('Customers') }}</flux:sidebar.item>
                         @endcan
                     </flux:sidebar.group>
                 @endif
-                @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class) || auth()->user()?->can('viewAny', App\Models\Payment::class) || auth()->user()?->can('pos.use'))
-                    <flux:sidebar.group heading="Sales" class="grid">
-                        @can('pos.use')
-                            <flux:sidebar.item icon="computer-desktop" :href="route('pos.index')" :current="request()->routeIs('pos.*')" wire:navigate>Point of Sale</flux:sidebar.item>
+
+                {{-- Inventory --}}
+                @if(auth()->user()?->can('inventory.view') || auth()->user()?->can('viewAny', App\Models\Product::class) || auth()->user()?->can('viewAny', App\Models\Category::class) || auth()->user()?->can('viewAny', App\Models\Unit::class) || auth()->user()?->can('viewAny', App\Models\Location::class))
+                    <flux:sidebar.group
+                        heading="{{ __('Inventory') }}"
+                        :expandable="true"
+                        :expanded="request()->routeIs('inventory.*', 'products.*', 'categories.*', 'units.*', 'locations.*')"
+                    >
+                        @can('inventory.view')
+                            <flux:sidebar.item icon="archive-box" :href="route('inventory.index')" :current="request()->routeIs('inventory.index')" wire:navigate>{{ __('Stock on Hand') }}</flux:sidebar.item>
+                            <flux:sidebar.item icon="clipboard-document-list" :href="route('inventory.ledger')" :current="request()->routeIs('inventory.ledger')" wire:navigate>{{ __('Stock Ledger') }}</flux:sidebar.item>
                         @endcan
-                        @can('viewAny', App\Models\Invoice::class)
-                            <flux:sidebar.item icon="document-text" :href="route('invoices.index')" :current="request()->routeIs('invoices.*')" wire:navigate>Invoices</flux:sidebar.item>
+                        @can('viewAny', App\Models\Product::class)
+                            <flux:sidebar.item icon="cube" :href="route('products.index')" :current="request()->routeIs('products.*')" wire:navigate>{{ __('Products') }}</flux:sidebar.item>
                         @endcan
-                        @can('viewAny', App\Models\Payment::class)
-                            <flux:sidebar.item icon="banknotes" :href="route('payments.index')" :current="request()->routeIs('payments.*')" wire:navigate>Payments</flux:sidebar.item>
+                        @can('viewAny', App\Models\Category::class)
+                            <flux:sidebar.item icon="tag" :href="route('categories.index')" :current="request()->routeIs('categories.*')" wire:navigate>{{ __('Categories') }}</flux:sidebar.item>
                         @endcan
-                        @can('viewAny', App\Models\Customer::class)
-                            <flux:sidebar.item icon="users" :href="route('customers.index')" :current="request()->routeIs('customers.*')" wire:navigate>Customers</flux:sidebar.item>
+                        @can('viewAny', App\Models\Unit::class)
+                            <flux:sidebar.item icon="scale" :href="route('units.index')" :current="request()->routeIs('units.*')" wire:navigate>{{ __('Units') }}</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', App\Models\Location::class)
+                            <flux:sidebar.item icon="map-pin" :href="route('locations.index')" :current="request()->routeIs('locations.*')" wire:navigate>{{ __('Locations') }}</flux:sidebar.item>
+                        @endcan
+                    </flux:sidebar.group>
+                @endif
+
+                {{-- Reports --}}
+                @can('reports.view')
+                    <flux:sidebar.group
+                        heading="{{ __('Reports') }}"
+                        :expandable="true"
+                        :expanded="request()->routeIs('reports.*')"
+                    >
+                        <flux:sidebar.item icon="chart-bar" :href="route('reports.sales')" :current="request()->routeIs('reports.sales')" wire:navigate>{{ __('Sales Summary') }}</flux:sidebar.item>
+                        <flux:sidebar.item icon="document-chart-bar" :href="route('reports.vat')" :current="request()->routeIs('reports.vat')" wire:navigate>{{ __('VAT Summary') }}</flux:sidebar.item>
+                        <flux:sidebar.item icon="clock" :href="route('reports.receivables')" :current="request()->routeIs('reports.receivables')" wire:navigate>{{ __('Receivables Aging') }}</flux:sidebar.item>
+                        <flux:sidebar.item icon="banknotes" :href="route('reports.payments')" :current="request()->routeIs('reports.payments')" wire:navigate>{{ __('Payments by Method') }}</flux:sidebar.item>
+                        <flux:sidebar.item icon="computer-desktop" :href="route('reports.pos_sessions')" :current="request()->routeIs('reports.pos_sessions')" wire:navigate>{{ __('POS Sessions') }}</flux:sidebar.item>
+                        <flux:sidebar.item icon="archive-box" :href="route('reports.inventory')" :current="request()->routeIs('reports.inventory')" wire:navigate>{{ __('Inventory') }}</flux:sidebar.item>
+                        <flux:sidebar.item icon="x-circle" :href="route('reports.voided_invoices')" :current="request()->routeIs('reports.voided_invoices')" wire:navigate>{{ __('Voided Invoices') }}</flux:sidebar.item>
+                    </flux:sidebar.group>
+                @endcan
+
+                {{-- Administration --}}
+                @if(auth()->user()?->can('users.view') || auth()->user()?->can('viewAny', App\Models\Setting::class))
+                    <flux:sidebar.group
+                        heading="{{ __('Administration') }}"
+                        :expandable="true"
+                        :expanded="request()->routeIs('users.*', 'settings.*')"
+                    >
+                        @can('users.view')
+                            <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>{{ __('Users') }}</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', App\Models\Setting::class)
+                            <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>{{ __('Business Settings') }}</flux:sidebar.item>
                         @endcan
                     </flux:sidebar.group>
                 @endif
