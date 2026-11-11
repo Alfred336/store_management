@@ -33,6 +33,13 @@ class EnforceMustChangePassword
     public function handle(Request $request, Closure $next): Response
     {
         if (Auth::check() && Auth::user()->must_change_password) {
+            // Livewire posts every form to its own update endpoint. Let it through here:
+            // Livewire re-runs this middleware (persistent middleware) against the page the
+            // component belongs to, so components on other pages are still blocked.
+            if ($request->routeIs('*livewire.update')) {
+                return $next($request);
+            }
+
             foreach (self::EXEMPT_ROUTES as $pattern) {
                 if ($request->routeIs($pattern)) {
                     return $next($request);

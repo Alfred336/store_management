@@ -40,23 +40,75 @@ test('user with must_change_password can log out', function (): void {
     $this->assertGuest();
 });
 
-test('livewire wire call from non-exempt page is redirected to change-password page for must_change_password user', function (): void {
+test('livewire update endpoint without required headers returns 404', function (): void {
     $user = User::factory()->create(['must_change_password' => true]);
     $this->actingAs($user);
 
-    // A Livewire wire call with no special headers must be redirected.
-    $this->post(route('default-livewire.update'))->assertRedirect(route('password.change'));
+    // The web-group pass now exempts *livewire.update so it no longer redirects here.
+    // RequireLivewireHeaders runs next and returns 404 for requests missing X-Livewire.
+    $this->post(route('default-livewire.update'))->assertNotFound();
 });
 
-test('livewire wire call is blocked even when a spoofed Referer header points to the change-password page', function (): void {
+test('livewire update for a non-exempt page component is blocked by persistent middleware while must_change_password is true', function (): void {
+    // Need a fully-permissioned user to load the dashboard snapshot.
+    app(EnsureSystemRoles::class)();
+    $user = User::factory()->create(['must_change_password' => false]);
+    $user->assignRole('Admin');
+    $this->actingAs($user);
+
+    // GET the dashboard while the flag is false to obtain a valid, server-signed snapshot.
+    $html = $this->get(route('dashboard'))->assertOk()->getContent();
+    preg_match('/wire:snapshot="([^"]+)"/', $html, $matches);
+    $snapshot = htmlspecialchars_decode($matches[1], ENT_QUOTES | ENT_SUBSTITUTE);
+
+    // Flip the flag in the DB; the next request re-loads the user from the session.
+    $user->forceFill(['must_change_password' => true])->save();
+
+    // Real Livewire POST:
+    //   • web-group: EnforceMustChangePassword exempts *livewire.update → passes through
+    //   • RequireLivewireHeaders: X-Livewire + JSON content-type present → passes
+    //   • snapshot-verified: persistent middleware re-runs EnforceMustChangePassword
+    //     against a fake request built from memo.path (/dashboard) → not exempt → HTTP 302
+    $this->withHeaders(['X-Livewire' => '1', 'Content-Type' => 'application/json'])
+        ->postJson(route('default-livewire.update'), [
+            'components' => [[
+                'snapshot' => $snapshot,
+                'updates' => [],
+                'calls' => [],
+            ]],
+        ])
+        ->assertRedirect(route('password.change'));
+});
+
+test('livewire update for the change-password component succeeds through real http and clears must_change_password', function (): void {
     $user = User::factory()->create(['must_change_password' => true]);
     $this->actingAs($user);
 
-    // The middleware must NOT use the client-controlled Referer header to decide
-    // whether to allow a request through.  A spoofed Referer must be ignored.
-    $this->withHeaders(['Referer' => route('password.change')])
-        ->post(route('default-livewire.update'))
-        ->assertRedirect(route('password.change'));
+    // GET the change-password page to obtain a valid, server-signed snapshot.
+    $html = $this->get(route('password.change'))->assertOk()->getContent();
+    preg_match('/wire:snapshot="([^"]+)"/', $html, $matches);
+    $snapshot = htmlspecialchars_decode($matches[1], ENT_QUOTES | ENT_SUBSTITUTE);
+
+    // Real Livewire POST:
+    //   • web-group: exempted (routeIs *livewire.update) → passes
+    //   • persistent middleware: re-runs against memo.path (password.change) → exempt → passes
+    //   • updatePassword runs, sets must_change_password=false, adds redirect effect
+    $response = $this->withHeaders(['X-Livewire' => '1', 'Content-Type' => 'application/json'])
+        ->postJson(route('default-livewire.update'), [
+            'components' => [[
+                'snapshot' => $snapshot,
+                'updates' => [
+                    'current_password' => 'password',
+                    'password' => 'NewSecure!123',
+                    'password_confirmation' => 'NewSecure!123',
+                ],
+                'calls' => [['method' => 'updatePassword', 'params' => []]],
+            ]],
+        ]);
+
+    $response->assertOk();
+    expect($response->json('components.0.effects.redirect'))->toBe(route('dashboard'));
+    expect($user->fresh()->must_change_password)->toBeFalse();
 });
 
 // ─── ChangePassword component ─────────────────────────────────────────────────
