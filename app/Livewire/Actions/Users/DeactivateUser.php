@@ -4,7 +4,6 @@ namespace App\Livewire\Actions\Users;
 
 use App\Models\AdminAuditLog;
 use App\Models\User;
-use App\Services\Auth\EmailVerificationService;
 use App\Services\Authorization\AdminAccountProtection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -37,10 +36,6 @@ class DeactivateUser
 
             $target->update(['is_active' => false]);
             $target->deleteSessions();
-
-            // Delete any pending verification codes so they cannot be used after
-            // the account is reactivated (a fresh code will be issued then).
-            app(EmailVerificationService::class)->deletePendingCodes($target);
 
             AdminAuditLog::record('user.deactivated', User::class, $target->id);
 

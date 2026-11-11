@@ -2,34 +2,33 @@
 
 namespace App\Livewire\Actions\Users;
 
+use App\Mail\TemporaryPasswordMail;
 use App\Models\AdminAuditLog;
 use App\Models\User;
-use App\Services\Auth\EmailVerificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
- * Reset a user's password to a new temporary password.
- * Returns the plain password — shown once and never logged.
+ * Reset a user's password to a new temporary password and email it to them.
+ * Mail failure rolls back the password change so the user is not left without credentials.
  *
- * @return array{user: User, password: string}
+ * @return array{user: User}
  */
 class ResetUserPassword
 {
     /**
-     * @return array{user: User, password: string}
+     * @return array{user: User}
      */
-    public function __invoke(User $target, ?string $plainPassword = null): array
+    public function __invoke(User $target): array
     {
         Gate::authorize('resetPassword', $target);
 
-        $password = $plainPassword && trim($plainPassword) !== ''
-            ? trim($plainPassword)
-            : Str::password(16);
+        $password = Str::password(16);
 
-        return DB::transaction(function () use ($target, $password): array {
+        $user = DB::transaction(function () use ($target, $password): User {
             $target->forceFill([
                 'password' => Hash::make($password),
                 'must_change_password' => true,
@@ -38,14 +37,15 @@ class ResetUserPassword
             // Invalidate all existing sessions so the new password takes effect immediately.
             $target->deleteSessions();
 
-            // Delete pending verification codes — the user will get a fresh code
-            // after they change their password.  email_verified_at is NOT cleared;
-            // an already-verified email stays verified after an admin reset.
-            app(EmailVerificationService::class)->deletePendingCodes($target);
-
             AdminAuditLog::record('user.password_reset', User::class, $target->id);
 
-            return ['user' => $target->fresh(), 'password' => $password];
+            // Send the new credentials email inside the transaction so a mail failure
+            // rolls back the password change — the user keeps their current credentials.
+            Mail::to($target)->send(new TemporaryPasswordMail($target, $password));
+
+            return $target->fresh();
         });
+
+        return ['user' => $user];
     }
 }

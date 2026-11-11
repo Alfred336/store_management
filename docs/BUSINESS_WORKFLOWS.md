@@ -100,6 +100,33 @@ Two `Product` model scopes compute alert states using PostgreSQL subqueries agai
 ## Customer statements
 
 Customer balances are calculated at read time from issued, partially paid, and paid invoices (`total − amount_paid`); draft and void invoices are excluded. The in-app details panel lists recent invoices and payments, while the downloadable PDF statement renders full history.
+## User Deletion (Phase 7D)
+
+### Hard delete (no activity)
+
+When an admin triggers deletion of a user who has no invoices, payments, stock movements, POS sessions, or audit log rows as actor, `DeleteUser` performs a hard delete inside a DB transaction:
+
+1. Locks active admin rows and asserts the target is not the last active Admin.
+2. Checks for an open POS session (refuses if found).
+3. Asserts the user has no activity across all five tables.
+4. Writes an `admin_audit_logs` row (`user.deleted`) before the row is removed.
+5. Deletes sessions and hard-deletes the user row.
+
+### Anonymize (has activity)
+
+When the target has any activity history, `AnonymizeUser` anonymizes instead of deleting:
+
+1. Same locking and last-Admin / open-POS-session guards as the hard-delete path.
+2. Deletes `password_reset_tokens` keyed by the original email (before changing it).
+3. Deletes all sessions and passkeys.
+4. Revokes all roles.
+5. Overwrites the user row: `name = "Deleted user #<id>"`, `email = "deleted-<id>@deleted.invalid"`, random unusable password, `is_active = false`, all 2FA fields nulled, `anonymized_at = now()`.
+6. Writes an `admin_audit_logs` row (`user.anonymized`) with `original_name` and `original_email`.
+
+The freed email address can be reused immediately for a new account. Anonymized users cannot log in (is_active = false), be reactivated, or be edited. They are excluded from all user-list filters except "Deleted (anonymized)".
+
+The UI requires the actor to type the target's email address to confirm the anonymize action before the button becomes effective.
+
 ## Reports (Phase 6A)
 
 ### Sales Summary and VAT Summary

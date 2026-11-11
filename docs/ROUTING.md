@@ -1,6 +1,6 @@
 # Routing
 
-All project routes live in clearly commented sections in `routes/web.php`. `bootstrap/app.php` uses the default Laravel web, console and health route registration, with the setup middleware appended to the web middleware group. Authenticated application pages apply `auth` and `verified` middleware. Exception: `/password/change` and `/email/verify-code` apply `auth` only — placing them in the `verified` group would cause an infinite redirect loop for admin-created users who have `must_change_password=true` and `email_verified_at=null`.
+All project routes live in clearly commented sections in `routes/web.php`. `bootstrap/app.php` uses the default Laravel web, console and health route registration, with the setup middleware appended to the web middleware group. Authenticated application pages apply `auth` middleware. Exception: `/password/change` applies `auth` only in its own group — placing it in a group with other routes would cause it to be caught by `EnforceMustChangePassword` before the user can reach it.
 
 First-run setup is registered in the Initial setup section of `routes/web.php`, outside the authenticated route group. The web middleware redirects only when `setup_completed_at` is absent and no user exists. The setup page is blocked when that persistent setting exists, including after user deletion. Setup writes company details and completion state into the Settings table.
 
@@ -32,8 +32,7 @@ First-run setup is registered in the Initial setup section of `routes/web.php`, 
 | GET | `/reports/voided-invoices` | `reports.voided_invoices` | `App\Livewire\Reports\VoidedInvoices\Index` |
 | GET | `/reports/{report}/pdf` | `reports.pdf` | `ReportPdfController` (A4 landscape DomPDF; slugs: `sales`, `vat`, `receivables`, `payments`, `pos-sessions`, `inventory`, `voided-invoices`) |
 | GET | `/admin/users` | `users.index` | `App\Livewire\Users\Index` |
-| GET | `/password/change` | `password.change` | `App\Livewire\Auth\ChangePassword` (auth only — not verified) |
-| GET | `/email/verify-code` | `verification.notice` | `App\Livewire\Auth\VerifyEmailCode` (auth only — not verified; target of `EnsureEmailIsVerified`) |
+| GET | `/password/change` | `password.change` | `App\Livewire\Auth\ChangePassword` (auth only — separate group) |
 
 Routes are grouped and commented in `routes/web.php`: setup outside auth, followed by dashboard, inventory, customers, and business settings inside the authenticated group. Create, details, update, and delete interactions are modal/actions on each resource's Index component; there are no separate create/edit/show routes or resource controllers. Every component operation and Action enforces its registered policy.
 

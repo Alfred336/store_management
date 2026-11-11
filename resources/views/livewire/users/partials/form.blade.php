@@ -21,10 +21,6 @@
                 @error('roles.*') <flux:error>{{ $message }}</flux:error> @enderror
             </div>
 
-            @if (!$userId)
-                <flux:input wire:model="password" type="password" label="Temporary password"
-                            description="Leave blank to auto-generate." placeholder="Min. 8 characters" />
-            @endif
         </div>
 
         @if ($errors->any())

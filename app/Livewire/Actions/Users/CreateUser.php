@@ -2,33 +2,34 @@
 
 namespace App\Livewire\Actions\Users;
 
+use App\Mail\TemporaryPasswordMail;
 use App\Models\AdminAuditLog;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 
 /**
  * Create a new user account with one or more roles.
- * Returns ['user' => User, 'password' => string] — the plain password is shown
- * once in the UI and never logged.
+ * Generates a temporary password, emails it to the user, and returns the new user.
+ * Mail failure rolls back the entire transaction so no half-created user is left behind.
  *
- * @return array{user: User, password: string}
+ * @return array{user: User}
  */
 class CreateUser
 {
     /**
      * @param  string[]  $roleNames
-     * @return array{user: User, password: string}
+     * @return array{user: User}
      */
     public function __invoke(
         string $name,
         string $email,
         array $roleNames,
-        ?string $plainPassword = null,
     ): array {
         Gate::authorize('create', User::class);
 
@@ -40,11 +41,9 @@ class CreateUser
 
         $this->validateRoleAssignment($actor, $roleNames);
 
-        $password = $plainPassword && trim($plainPassword) !== ''
-            ? trim($plainPassword)
-            : Str::password(16);
+        $password = Str::password(16);
 
-        return DB::transaction(function () use ($name, $email, $roleNames, $password): array {
+        $user = DB::transaction(function () use ($name, $email, $roleNames, $password): User {
             if (User::where('email', $email)->exists()) {
                 throw ValidationException::withMessages(['email' => 'A user with this email already exists.']);
             }
@@ -66,8 +65,14 @@ class CreateUser
                 'roles' => $roleNames,
             ]);
 
-            return ['user' => $user, 'password' => $password];
+            // Send the welcome email inside the transaction so a mail failure causes
+            // the entire transaction to roll back — no user is left without credentials.
+            Mail::to($user)->send(new TemporaryPasswordMail($user, $password));
+
+            return $user;
         });
+
+        return ['user' => $user];
     }
 
     /**

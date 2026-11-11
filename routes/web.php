@@ -6,7 +6,6 @@ use App\Http\Controllers\InvoicePdfController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\Reports\ReportPdfController;
 use App\Livewire\Auth\ChangePassword;
-use App\Livewire\Auth\VerifyEmailCode;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
 use App\Livewire\Dashboard\Index as DashboardIndex;
@@ -35,21 +34,13 @@ Route::redirect('/', '/login')->name('home');
 // Initial setup: deliberately outside the authenticated route group.
 Route::livewire('setup', SetupIndex::class)->name('setup.index');
 
-// Routes that require authentication but NOT email verification.
-// password.change and email/verify-code must not sit inside the 'verified'
-// middleware group — doing so would create an infinite redirect loop for
-// admin-created users who have must_change_password=true + email_verified_at=null.
+// Password change is outside the main group so a user with must_change_password=true
+// can reach it without being redirected in a loop.
 Route::middleware(['auth'])->group(function (): void {
     Route::livewire('password/change', ChangePassword::class)->name('password.change');
-
-    // Named 'verification.code' (NOT 'verification.notice') to avoid being overwritten
-    // by Fortify, whose FortifyServiceProvider boots after routes/web.php is loaded and
-    // would re-register 'verification.notice' → /email/verify (the click-link page).
-    // All 'verified' middleware declarations pass this name explicitly: verified:verification.code
-    Route::livewire('email/verify-code', VerifyEmailCode::class)->name('verification.code');
 });
 
-Route::middleware(['auth', 'verified:verification.code'])->group(function (): void {
+Route::middleware(['auth'])->group(function (): void {
     // Dashboard.
     Route::livewire('dashboard', DashboardIndex::class)->name('dashboard');
 

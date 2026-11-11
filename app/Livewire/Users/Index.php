@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Users;
 
+use App\Livewire\Actions\Users\AnonymizeUser;
 use App\Livewire\Actions\Users\CreateUser;
 use App\Livewire\Actions\Users\DeactivateUser;
 use App\Livewire\Actions\Users\DeleteUser;
@@ -23,7 +24,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
 
-/** Manage user accounts: create, edit, deactivate, reset password, 2FA and delete. */
+/** Manage user accounts: create, edit, deactivate, reset password, 2FA, delete and anonymize. */
 #[Title('Users')]
 class Index extends Component
 {
@@ -46,10 +47,8 @@ class Index extends Component
 
     public bool $showDeleteConfirmation = false;
 
-    public bool $showPasswordReveal = false;
-
-    /** Plain-text temporary password shown once after create/reset. */
-    public string $revealedPassword = '';
+    /** True when the selected user has activity history (anonymize path). */
+    public bool $hasActivity = false;
 
     // ─── Form fields ────────────────────────────────────────────────────────
 
@@ -63,7 +62,9 @@ class Index extends Component
     /** @var string[] */
     public array $roles = [];
 
-    public string $password = '';
+    // ─── Anonymize email confirmation ────────────────────────────────────────
+
+    public string $confirmEmail = '';
 
     // ─── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -112,12 +113,18 @@ class Index extends Component
     {
         $user = User::query()->findOrFail($id);
         $this->authorize('update', $user);
+
+        if ($user->anonymized_at !== null) {
+            Flux::toast(variant: 'danger', text: 'Anonymized users cannot be edited.');
+
+            return;
+        }
+
         $this->clearFormState();
         $this->userId = $user->id;
         $this->name = $user->name;
         $this->email = $user->email;
         $this->roles = $user->roles->pluck('name')->all();
-        $this->password = '';
         $this->showForm = true;
         $this->showDetails = false;
         $this->dispatch('modal-show', name: 'user-form');
@@ -144,21 +151,19 @@ class Index extends Component
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
-            'password' => ['nullable', 'string', 'min:8', 'max:255'],
         ]);
 
-        $result = $createUser(
-            $data['name'],
-            $data['email'],
-            $data['roles'],
-            $data['password'] ?: null,
-        );
+        try {
+            $createUser($data['name'], $data['email'], $data['roles']);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('error', 'Could not send the welcome email. Please try again or check your mail settings.');
+
+            return;
+        }
 
         $this->closeForm();
-        $this->revealedPassword = $result['password'];
-        $this->showPasswordReveal = true;
-        $this->dispatch('modal-show', name: 'user-password-reveal');
-        Flux::toast(variant: 'success', text: 'User created. Share the temporary password shown.');
+        Flux::toast(variant: 'success', text: 'User created. A welcome email has been sent with their temporary password.');
     }
 
     public function update(UpdateUser $updateUser): void
@@ -214,6 +219,13 @@ class Index extends Component
     {
         $user = User::query()->findOrFail($id);
         $this->authorize('deactivateAdmin', $user);
+
+        if ($user->anonymized_at !== null) {
+            Flux::toast(variant: 'danger', text: 'Anonymized users cannot be reactivated.');
+
+            return;
+        }
+
         $reactivateUser($user);
         Flux::toast(variant: 'success', text: 'User reactivated.');
     }
@@ -224,18 +236,17 @@ class Index extends Component
     {
         $user = User::query()->findOrFail($id);
         $this->authorize('resetPassword', $user);
-        $result = $resetUserPassword($user);
-        $this->revealedPassword = $result['password'];
-        $this->showPasswordReveal = true;
-        $this->dispatch('modal-show', name: 'user-password-reveal');
-        Flux::toast(variant: 'success', text: 'Password reset. Share the temporary password shown.');
-    }
 
-    public function closePasswordReveal(): void
-    {
-        $this->showPasswordReveal = false;
-        $this->revealedPassword = '';
-        $this->dispatch('modal-close', name: 'user-password-reveal');
+        try {
+            $resetUserPassword($user);
+        } catch (\Throwable $e) {
+            report($e);
+            Flux::toast(variant: 'danger', text: 'Could not send the password reset email. Please try again or check your mail settings.');
+
+            return;
+        }
+
+        Flux::toast(variant: 'success', text: 'Password reset. A new temporary password has been emailed to the user.');
     }
 
     // ─── Reset 2FA ──────────────────────────────────────────────────────────
@@ -248,13 +259,22 @@ class Index extends Component
         Flux::toast(variant: 'success', text: 'Two-factor authentication cleared.');
     }
 
-    // ─── Delete ─────────────────────────────────────────────────────────────
+    // ─── Delete / Anonymize ─────────────────────────────────────────────────
 
     public function confirmDelete(int $id): void
     {
         $user = User::query()->findOrFail($id);
         $this->authorize('deleteAdmin', $user);
+
+        if ($user->anonymized_at !== null) {
+            Flux::toast(variant: 'danger', text: 'This user has already been anonymized.');
+
+            return;
+        }
+
         $this->userId = $user->id;
+        $this->hasActivity = $this->userHasActivity($id);
+        $this->confirmEmail = '';
         $this->showDeleteConfirmation = true;
         $this->dispatch('modal-show', name: 'user-delete');
     }
@@ -268,10 +288,28 @@ class Index extends Component
         Flux::toast(variant: 'success', text: 'User deleted.');
     }
 
+    public function anonymize(AnonymizeUser $anonymizeUser): void
+    {
+        $user = User::query()->findOrFail($this->requiredUserId());
+        $this->authorize('deleteAdmin', $user);
+
+        if (strtolower(trim($this->confirmEmail)) !== strtolower($user->email)) {
+            $this->addError('confirmEmail', 'The email address does not match.');
+
+            return;
+        }
+
+        $anonymizeUser($user);
+        $this->closeDeleteConfirmation();
+        Flux::toast(variant: 'success', text: 'User permanently anonymized. Historical records are preserved.');
+    }
+
     public function closeDeleteConfirmation(): void
     {
         $this->showDeleteConfirmation = false;
         $this->userId = null;
+        $this->hasActivity = false;
+        $this->confirmEmail = '';
         $this->dispatch('modal-close', name: 'user-delete');
     }
 
@@ -282,7 +320,9 @@ class Index extends Component
         abort_unless(auth()->user()?->can('users.view'), 403);
 
         $term = $this->search !== '' ? '%'.$this->search.'%' : null;
-        $statusFilter = in_array($this->statusFilter, ['all', 'active', 'inactive'], true) ? $this->statusFilter : 'active';
+
+        $validStatusFilters = ['all', 'active', 'inactive', 'deleted'];
+        $statusFilter = in_array($this->statusFilter, $validStatusFilters, true) ? $this->statusFilter : 'active';
 
         $users = User::query()
             ->with('roles')
@@ -290,7 +330,10 @@ class Index extends Component
                 $q->where('name', 'ILIKE', $term)->orWhere('email', 'ILIKE', $term);
             }))
             ->when($this->roleFilter !== '', fn (Builder $q) => $q->whereHas('roles', fn (Builder $r) => $r->where('name', $this->roleFilter)))
-            ->when($statusFilter !== 'all', fn (Builder $q) => $q->where('is_active', $statusFilter === 'active'))
+            ->when($statusFilter === 'deleted', fn (Builder $q) => $q->whereNotNull('anonymized_at'))
+            ->when($statusFilter !== 'deleted', fn (Builder $q) => $q->whereNull('anonymized_at'))
+            ->when($statusFilter === 'active', fn (Builder $q) => $q->where('is_active', true))
+            ->when($statusFilter === 'inactive', fn (Builder $q) => $q->where('is_active', false))
             ->orderBy('name')
             ->paginate(20);
 
@@ -325,7 +368,6 @@ class Index extends Component
         $this->name = '';
         $this->email = '';
         $this->roles = [];
-        $this->password = '';
         $this->resetValidation();
     }
 
@@ -334,6 +376,11 @@ class Index extends Component
         abort_if($this->userId === null, 404);
 
         return $this->userId;
+    }
+
+    private function userHasActivity(int $id): bool
+    {
+        return array_sum($this->getActivityCounts($id)) > 0;
     }
 
     /** @return array<string, int> */
@@ -351,6 +398,9 @@ class Index extends Component
                 ->count(),
             'pos_sessions' => DB::table('pos_sessions')
                 ->where(fn ($q) => $q->where('user_id', $id)->orWhere('closed_by', $id))
+                ->count(),
+            'audit_logs' => DB::table('admin_audit_logs')
+                ->where('actor_id', $id)
                 ->count(),
         ];
     }

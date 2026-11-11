@@ -21,6 +21,7 @@
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="all">All users</option>
+            <option value="deleted">Deleted (anonymized)</option>
         </flux:select>
     </div>
 
@@ -28,5 +29,4 @@
     @include('livewire.users.partials.form')
     @include('livewire.users.partials.details')
     @include('livewire.users.partials.delete-confirmation')
-    @include('livewire.users.partials.password-reveal')
 </div>

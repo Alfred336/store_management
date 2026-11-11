@@ -23,9 +23,7 @@ test('unverified users are redirected to the email verification prompt', functio
 
     $response = $this->actingAs($user)->get(route('appearance.edit'));
 
-    // Our verified middleware uses verified:verification.code, so unverified users
-    // are redirected to our 6-digit code screen, not Fortify's click-link screen.
-    $response->assertRedirect(route('verification.code'));
+    $response->assertRedirect(route('verification.notice'));
 });
 
 test('email can be verified', function () {

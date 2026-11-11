@@ -27,6 +27,18 @@ class DeleteUser
             $lockedAdminCount = $this->protection->lockAdmins();
             $this->protection->assertCanRemove($target, $lockedAdminCount);
 
+            // Refuse if the user has an open POS session.
+            $openSession = DB::table('pos_sessions')
+                ->where('user_id', $target->id)
+                ->where('status', 'open')
+                ->first();
+
+            if ($openSession !== null) {
+                throw ValidationException::withMessages([
+                    'account' => 'This user has an open POS session. Close it before deleting.',
+                ]);
+            }
+
             $this->assertNoActivity($target);
 
             AdminAuditLog::record('user.deleted', User::class, $target->id, [

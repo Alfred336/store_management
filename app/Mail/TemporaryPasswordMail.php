@@ -10,30 +10,30 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Email sent to a user containing their 6-digit verification code.
+ * Email sent to a user containing their temporary password.
  * Sent synchronously (does not implement ShouldQueue).
  */
-class VerificationCodeMail extends Mailable
+class TemporaryPasswordMail extends Mailable
 {
     use Queueable, SerializesModels;
 
     public function __construct(
         public readonly User $user,
-        public readonly string $code,
+        public readonly string $password,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Verify your email address — '.config('app.name'),
+            subject: 'Your account is ready — '.config('app.name'),
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            view: 'mail.verification-code',
-            text: 'mail.verification-code-text',
+            view: 'mail.temporary-password',
+            text: 'mail.temporary-password-text',
         );
     }
 }

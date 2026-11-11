@@ -4,13 +4,11 @@ namespace App\Livewire\Auth;
 
 use App\Concerns\PasswordValidationRules;
 use App\Models\User;
-use App\Services\Auth\EmailVerificationService;
 use Closure;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -39,64 +37,39 @@ class ChangePassword extends Component
 
     public function updatePassword(): void
     {
-        try {
-            $validated = $this->validate([
-                'current_password' => $this->currentPasswordRules(),
-                'password' => [
-                    ...$this->passwordRules(),
-                    function (string $attribute, mixed $value, Closure $fail): void {
-                        if (Hash::check($value, Auth::user()->getAuthPassword())) {
-                            $fail('Your new password must be different from your current password.');
-                        }
-                    },
-                ],
-            ]);
-        } catch (ValidationException $e) {
-            $this->reset('current_password', 'password', 'password_confirmation');
-            throw $e;
-        }
+        $validated = $this->validate([
+            'current_password' => $this->currentPasswordRules(),
+            'password' => [
+                ...$this->passwordRules(),
+                function (string $_attribute, mixed $value, Closure $fail): void {
+                    if (Hash::check($value, Auth::user()->getAuthPassword())) {
+                        $fail('Your new password must be different from your current password.');
+                    }
+                },
+            ],
+        ]);
 
         /** @var User $user */
         $user = Auth::user();
 
-        // Admin-created users must verify their email after changing their temporary password.
-        // The password save and code creation must both succeed or both roll back — a mail
-        // failure must not leave the user with a changed password but no code to verify.
-        if ($user->email_verified_at === null) {
-            DB::beginTransaction();
-            try {
-                $user->forceFill([
-                    'password' => $validated['password'],
-                    'must_change_password' => false,
-                ])->save();
-
-                // sendCode() runs its own nested transaction (savepoint) then sends the mail.
-                // If Mail::send() throws, the exception propagates here, we roll back the
-                // outer transaction, and neither the password change nor the code record persist.
-                app(EmailVerificationService::class)->sendCode($user);
-
-                DB::commit();
-            } catch (\Throwable) {
-                DB::rollBack();
-                $this->addError('password', 'Could not send the verification email. Please try again or contact your administrator.');
-
-                return;
-            }
-
-            $this->redirect(route('verification.code'), navigate: true);
-
-            return;
-        }
-
-        // Already-verified path (e.g. admin password-reset where email stays verified).
         $user->forceFill([
             'password' => $validated['password'],
             'must_change_password' => false,
+            'email_verified_at' => $user->email_verified_at ?? now(),
         ])->save();
+
+        // Refresh the guard's cached user instance so that any middleware running
+        // during the redirect sees must_change_password = false immediately,
+        // without waiting for a new DB round-trip via the session user ID.
+        Auth::setUser($user);
+
+        // Store the new password hash in the session so that AuthenticateSession
+        // (if ever enabled) does not invalidate this session on the next request.
+        Session::put('password_hash_'.Auth::getDefaultDriver(), $user->getAuthPassword());
 
         Flux::toast(variant: 'success', text: 'Password updated successfully.');
 
-        $this->redirect(route('dashboard'), navigate: true);
+        $this->redirect(route('dashboard'));
     }
 
     public function render(): View

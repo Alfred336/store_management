@@ -19,6 +19,12 @@ class UpdateUser
     {
         Gate::authorize('update', $target);
 
+        if ($target->anonymized_at !== null) {
+            throw ValidationException::withMessages([
+                'account' => 'Anonymized users cannot be edited.',
+            ]);
+        }
+
         $actor = auth()->user();
 
         if (empty($roleNames)) {

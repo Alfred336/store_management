@@ -1,5 +1,66 @@
 # Changelog
 
+## [Phase 7D: Permanent User Deletion with Anonymize] - 2026-11-11
+
+### Added
+
+- **Migration** `2026_11_11_000001_add_anonymized_at_to_users_table.php`: adds nullable `users.anonymized_at` timestamp column.
+- **`AnonymizeUser` action** (`app/Livewire/Actions/Users/AnonymizeUser.php`): wipes personal data from a user who has activity history. Sets `name = "Deleted user #id"`, `email = deleted-<id>@deleted.invalid`, random unusable password, `is_active = false`, clears 2FA and passkeys, removes roles, deletes sessions and password-reset tokens, sets `anonymized_at`. Writes `user.anonymized` audit log. Protected against self-anonymize, last-Admin, and open POS session.
+- **Delete button** in the users table (permission `users.delete`) next to Deactivate/Reactivate. Hidden for already-anonymized rows.
+- **Two-path delete modal**: if the target has no activity, shows a simple hard-delete confirmation. If the target has activity history, shows an anonymize explanation and requires typing the user's email address to confirm.
+
+### Changed
+
+- **`Users/Index.php`**: added `$hasActivity`, `$confirmEmail` properties; `confirmDelete()` now detects activity; new `anonymize()` method; `reactivate()` and `openEdit()` guard against anonymized users; `statusFilter` accepts `'deleted'`; render query excludes anonymized users from all filters except `'deleted'`; `getActivityCounts()` now includes `admin_audit_logs` as-actor count.
+- **`DeleteUser` action**: added open POS session check (same guard as `DeactivateUser`).
+- **`UpdateUser` action**: refuses to edit anonymized users with a `ValidationException`.
+- **`ReactivateUser` action**: refuses to reactivate anonymized users with a `ValidationException`.
+- **`User` model**: `anonymized_at` added to `$fillable` and casts.
+- **Status filter** (`index.blade.php`): added "Deleted (anonymized)" option.
+- **Status badge** in table: shows "Anonymized" (zinc) badge for anonymized rows.
+- **`docs/SECURITY.md`** and **`docs/BUSINESS_WORKFLOWS.md`** updated.
+
+### Tests added (`tests/Feature/Users/UserManagementTest.php`)
+
+- Hard delete with open POS session refused.
+- Anonymize wipes personal data and sets `anonymized_at`.
+- Anonymize keeps invoice FK pointing to the row.
+- Anonymize writes audit log with `original_name` / `original_email`.
+- Anonymized user cannot log in.
+- Anonymized user cannot be reactivated.
+- Original email is reusable after anonymize.
+- Anonymize refused for self / last Admin / open POS session / non-admin.
+- Livewire: anonymize requires correct email confirmation.
+- Livewire: anonymize succeeds with correct confirmation.
+- Livewire: hard delete works for user with no activity.
+- Livewire: anonymized users hidden from active/all filters, visible in deleted filter.
+
+## [Phase 7C: Simplified Onboarding — Email Delivery of Temporary Password] - 2026-11-10
+
+### Added
+
+- **`TemporaryPasswordMail`** (`app/Mail/TemporaryPasswordMail.php`) + views (`resources/views/mail/temporary-password.blade.php`, `temporary-password-text.blade.php`): HTML + plain-text welcome email containing the user's login URL, email address, temporary password, and a first-login note.
+- **Migration** `2026_11_10_175339_drop_email_verification_codes_table.php`: permanently drops the `email_verification_codes` table.
+
+### Changed
+
+- **`CreateUser` action**: password parameter removed. The action always generates a 16-character random password (`Str::password(16)`), sends `TemporaryPasswordMail` synchronously inside the DB transaction, and returns `['user' => User]`. Mail failure rolls back user creation.
+- **`ResetUserPassword` action**: now sends `TemporaryPasswordMail` to the user inside the transaction. Mail failure rolls back the password change. No longer returns the plain password.
+- **`ChangePassword` component**: verification-code branch removed. After a successful password change, `email_verified_at` is set to `now()` if null; always redirects to `/dashboard`.
+- **`Users/Index.php`**: `$password`, `$showPasswordReveal`, `$revealedPassword` state removed. `store()` and `resetPassword()` wrap action calls in `try/catch`; mail failures surface as a form error or danger toast respectively.
+- **`routes/web.php`**: `email/verify-code` route and `VerifyEmailCode` import removed; `verified:verification.code` middleware replaced with plain `auth` on the main route group.
+- **`DeactivateUser` action**: `EmailVerificationService::deletePendingCodes()` call removed.
+
+### Removed
+
+- **`EmailVerificationService`** (`app/Services/Auth/EmailVerificationService.php`) — no longer needed.
+- **`EmailVerificationCode` model** (`app/Models/EmailVerificationCode.php`).
+- **`VerifyEmailCode` Livewire component** (`app/Livewire/Auth/VerifyEmailCode.php`) + blade view.
+- **`VerificationCodeMail`** + views (`verification-code.blade.php`, `verification-code-text.blade.php`).
+- **`password-reveal` modal partial** (`resources/views/livewire/users/partials/password-reveal.blade.php`) — passwords are no longer shown on screen.
+- **Password field** removed from the new-user form (`partials/form.blade.php`).
+- **`tests/Feature/Auth/EmailVerificationCodeTest.php`** — entire test file removed; superseded by updated `ChangePasswordTest` and `UserManagementTest`.
+
 ## [Phase 7B: Email Verification Code Flow] - 2026-11-08
 
 ### Added

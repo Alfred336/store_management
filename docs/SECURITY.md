@@ -71,21 +71,16 @@ Each Livewire action calls `$this->authorize(...)` or `Gate::authorize(...)` as 
 
 - **Registration disabled**: `Features::registration()` removed from `config/fortify.php`. `/register` returns 404.
 - **Inactive users**: `Fortify::authenticateUsing()` throws `ValidationException` before issuing a session. `EnforceActiveUser` middleware terminates active sessions if `is_active` changes to `false` mid-session.
-- **Forced password change**: `EnforceMustChangePassword` middleware redirects `must_change_password` users to `/password/change` (exempt: profile, security, logout, Livewire wire-requests). On successful change, `must_change_password` is cleared.
-- **Email verification code flow**: Admin-created users receive a temporary password, must change it on first login, then verify their email via a 6-digit code (not a click-link). The code is stored HMAC-SHA256 hashed, expires in 15 minutes, is invalidated after 5 wrong attempts, and resend is throttled to once per 60 seconds. After verification `email_verified_at` is set and the user reaches the dashboard. The `password.change` and `email/verify-code` routes sit in an `auth`-only group (not `auth,verified`) to prevent redirect loops.
-- **Redirect decision table** (admin-created user, first login):
-
-| `must_change_password` | `email_verified_at` | Middleware result |
-|---|---|---|
-| `true` | `null` | `EnforceMustChangePassword` → `/password/change` |
-| `false` | `null` | `EnsureEmailIsVerified` → `/email/verify-code` |
-| `false` | set | No redirect — user proceeds normally |
-
+- **Forced password change**: `EnforceMustChangePassword` middleware redirects `must_change_password` users to `/password/change` (exempt: profile, security, logout, Livewire wire-requests). On successful change, `must_change_password` is cleared and `email_verified_at` is set to `now()` if it was null.
+- **Onboarding flow** (admin-created users): Admin fills name, email, and roles. The system generates a 16-character random password (`Str::password(16)`), creates the user with `email_verified_at = now()` and `must_change_password = true`, and emails the temporary password synchronously. Mail failure rolls back the user creation. The temporary password is never shown on screen and never logged. On first login the user is redirected to `/password/change`; after changing their password they are redirected to the dashboard.
+- **Password reset flow**: Admin triggers a reset for another user. A new temporary password is generated, emailed to the user, and the user's sessions are invalidated. Mail failure rolls back the password change. After next login the user is forced to change password again.
+- **The `password.change` route** sits in an `auth`-only group (no `verified` middleware) to prevent redirect loops.
 - **Last active Admin protection**: `AdminAccountProtection::assertCanRemove()` refuses deactivation or deletion of the last active Admin. Counted with `is_active = true` filter.
 - **Self-protection**: `UserPolicy` methods `update`, `deactivateAdmin`, `resetPassword`, `deleteAdmin` reject `$actor->is($target)`.
 - **Privilege escalation**: `CreateUser` and `UpdateUser` validate that (a) only Admin can assign Admin role, (b) non-admins cannot assign roles whose permissions exceed their own.
 - **Sessions invalidated** on: deactivate, role change, password reset, 2FA reset.
-- **Temporary passwords** returned from `CreateUser`/`ResetUserPassword` as plain-text array element — shown once in UI, never logged, never stored plain.
+- **Temporary passwords** are generated internally, emailed to the user, and never shown on screen or stored in plain text.
+- **Permanent deletion (anonymize)**: Users with no activity history are hard-deleted. Users with any activity (invoices, payments, stock movements, POS sessions, audit log rows as actor) are anonymized instead: name set to "Deleted user #id", email to `deleted-<id>@deleted.invalid`, random unusable password, `is_active = false`, 2FA and passkeys cleared, all roles removed, sessions and password-reset tokens deleted, `anonymized_at` timestamp set. The row is kept so historical FK references remain valid. The freed email address can be reused immediately. Anonymized users cannot log in, be reactivated, or be edited. They are hidden from all list filters except "Deleted (anonymized)". Anonymize requires the actor to type the target's email address to confirm, as it cannot be undone. Refused if: actor is the target, target is the last active Admin, or target has an open POS session.
 
 | Permission | Who holds it |
 |---|---|
@@ -110,4 +105,5 @@ Each Livewire action calls `$this->authorize(...)` or `Gate::authorize(...)` as 
 | User deactivated/reactivated | `admin_audit_logs` |
 | Password reset | `admin_audit_logs` (no password stored) |
 | 2FA reset | `admin_audit_logs` |
-| User deleted | `admin_audit_logs` before deletion |
+| User deleted (hard) | `admin_audit_logs`: `action=user.deleted`, name/email snapshot before deletion |
+| User anonymized | `admin_audit_logs`: `action=user.anonymized`, `original_name`, `original_email` |
