@@ -163,7 +163,7 @@
                         :href="route('quotations.pdf', ['quotation' => $quot->id, 'mode' => 'download'])">
                         Download PDF
                     </flux:button>
-                    <flux:button size="sm" variant="ghost" icon="envelope" wire:click="closeDetails(); $nextTick(() => openEmailPanel({{ $quot->id }}))">
+                    <flux:button size="sm" variant="ghost" icon="envelope" x-on:click="$wire.closeDetails().then(() => $wire.openEmailPanel({{ $quot->id }}))">
                         Email
                     </flux:button>
                 @endcan
