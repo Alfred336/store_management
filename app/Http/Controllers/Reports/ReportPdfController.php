@@ -43,9 +43,8 @@ class ReportPdfController extends Controller
         Gate::authorize('reports.view');
         abort_unless(in_array($report, self::REPORTS, true), 404);
 
-        $tz = 'Africa/Dar_es_Salaam';
-        $from = Carbon::parse($request->input('dateFrom', now($tz)->startOfMonth()->toDateString()), $tz)->startOfDay();
-        $to = Carbon::parse($request->input('dateTo', now($tz)->endOfMonth()->toDateString()), $tz)->endOfDay();
+        $from = Carbon::parse($request->input('dateFrom', now()->startOfMonth()->toDateString()))->startOfDay();
+        $to = Carbon::parse($request->input('dateTo', now()->endOfMonth()->toDateString()))->endOfDay();
         $locationId = $request->filled('locationId') ? (int) $request->input('locationId') : null;
 
         $company = [
@@ -72,8 +71,8 @@ class ReportPdfController extends Controller
                 $vatSummary->get($from, $to, $locationId),
                 ['company' => $company, 'filters' => $filters, 'title' => 'VAT Summary']
             ),
-            'receivables' => (function () use ($request, $tz, $receivablesAging, $company): array {
-                $asOf = Carbon::parse($request->input('asOf', now($tz)->toDateString()), $tz)->endOfDay();
+            'receivables' => (function () use ($request, $receivablesAging, $company): array {
+                $asOf = Carbon::parse($request->input('asOf', now()->toDateString()))->endOfDay();
                 $result = $receivablesAging->get($asOf);
 
                 return array_merge($result, [

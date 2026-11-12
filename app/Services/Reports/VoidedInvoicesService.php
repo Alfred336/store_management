@@ -13,10 +13,9 @@ class VoidedInvoicesService
     /** @return LengthAwarePaginator<int, \stdClass> */
     public function paginate(Carbon $from, Carbon $to, ?int $locationId = null, int $perPage = 50): LengthAwarePaginator
     {
-        // Convert EAT boundaries to UTC for half-open range comparison against
-        // voided_at (timestamp without time zone, stored in UTC).
-        $startUtc = $from->copy()->utc()->toDateTimeString();
-        $endUtc = $to->copy()->addSecond()->utc()->toDateTimeString();
+        // Half-open range against voided_at (stored in app local time).
+        $start = $from->toDateTimeString();
+        $end = $to->copy()->addSecond()->toDateTimeString();
 
         return DB::table('invoices')
             ->join('customers', 'customers.id', '=', 'invoices.customer_id')
@@ -39,8 +38,8 @@ class VoidedInvoicesService
             ])
             ->where('invoices.status', InvoiceStatus::Void->value)
             ->whereNotNull('invoices.voided_at')
-            ->where('invoices.voided_at', '>=', $startUtc)
-            ->where('invoices.voided_at', '<', $endUtc)
+            ->where('invoices.voided_at', '>=', $start)
+            ->where('invoices.voided_at', '<', $end)
             ->when($locationId !== null, fn ($q) => $q->where('invoices.location_id', $locationId))
             ->orderBy('invoices.voided_at', 'desc')
             ->paginate($perPage);

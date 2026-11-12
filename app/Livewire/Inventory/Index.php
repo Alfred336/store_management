@@ -153,7 +153,7 @@ class Index extends Component
         $this->resetReceiveForm();
         $this->receiveProductId = $productId;
         $this->receiveLocationId = $locationId;
-        $this->dispatch('open-modal', name: 'receive-form');
+        $this->dispatch('modal-show', name: 'receive-form');
     }
 
     public function receive(ReceiveStock $action): void
@@ -199,7 +199,7 @@ class Index extends Component
                 'reason' => $this->receiveNotes !== '' ? $this->receiveNotes : null,
             ]);
 
-            $this->dispatch('close-modal', name: 'receive-form');
+            $this->dispatch('modal-close', name: 'receive-form');
             $this->resetReceiveForm();
             Flux::toast(variant: 'success', text: 'Stock received successfully.');
         } catch (ValidationException $e) {
@@ -237,7 +237,7 @@ class Index extends Component
         $this->adjustProductId = $productId;
         $this->adjustLocationId = $locationId;
         $this->adjustBatchId = $batchId;
-        $this->dispatch('open-modal', name: 'adjust-form');
+        $this->dispatch('modal-show', name: 'adjust-form');
     }
 
     public function adjust(AdjustStock $action): void
@@ -262,7 +262,7 @@ class Index extends Component
                 'person_name' => auth()->user()->name,
             ]);
 
-            $this->dispatch('close-modal', name: 'adjust-form');
+            $this->dispatch('modal-close', name: 'adjust-form');
             $this->resetAdjustForm();
             Flux::toast(variant: 'success', text: 'Stock adjusted successfully.');
         } catch (InsufficientStockException $e) {
@@ -297,7 +297,7 @@ class Index extends Component
         $this->transferProductId = $productId;
         $this->transferFromLocationId = $fromLocationId;
         $this->transferBatchId = $batchId;
-        $this->dispatch('open-modal', name: 'transfer-form');
+        $this->dispatch('modal-show', name: 'transfer-form');
     }
 
     public function transfer(TransferStock $action): void
@@ -322,7 +322,7 @@ class Index extends Component
                 'person_name' => auth()->user()->name,
             ]);
 
-            $this->dispatch('close-modal', name: 'transfer-form');
+            $this->dispatch('modal-close', name: 'transfer-form');
             $this->resetTransferForm();
             Flux::toast(variant: 'success', text: 'Stock transferred successfully.');
         } catch (InsufficientStockException $e) {

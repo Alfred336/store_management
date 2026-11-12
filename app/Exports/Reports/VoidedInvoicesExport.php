@@ -21,9 +21,8 @@ class VoidedInvoicesExport implements FromCollection, WithHeadings, WithMapping
     /** @return Collection<int, \stdClass> */
     public function collection(): Collection
     {
-        $tz = 'Africa/Dar_es_Salaam';
-        $startUtc = Carbon::parse($this->dateFrom, $tz)->startOfDay()->utc()->toDateTimeString();
-        $endUtc = Carbon::parse($this->dateTo, $tz)->addDay()->startOfDay()->utc()->toDateTimeString();
+        $start = Carbon::parse($this->dateFrom)->startOfDay()->toDateTimeString();
+        $end = Carbon::parse($this->dateTo)->addDay()->startOfDay()->toDateTimeString();
 
         return DB::table('invoices')
             ->join('customers', 'customers.id', '=', 'invoices.customer_id')
@@ -45,8 +44,8 @@ class VoidedInvoicesExport implements FromCollection, WithHeadings, WithMapping
             ])
             ->where('invoices.status', InvoiceStatus::Void->value)
             ->whereNotNull('invoices.voided_at')
-            ->where('invoices.voided_at', '>=', $startUtc)
-            ->where('invoices.voided_at', '<', $endUtc)
+            ->where('invoices.voided_at', '>=', $start)
+            ->where('invoices.voided_at', '<', $end)
             ->when($this->locationId !== null, fn ($q) => $q->where('invoices.location_id', $this->locationId))
             ->orderBy('invoices.voided_at', 'desc')
             ->get();

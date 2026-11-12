@@ -27,8 +27,15 @@
             <flux:input wire:model="invoicePrefix" label="Invoice prefix" required />
             <flux:input wire:model="receiptPrefix" label="Receipt prefix" required />
             <flux:input wire:model="paymentPrefix" label="Payment prefix" required />
+            <flux:input wire:model="quotationPrefix" label="Quotation prefix" required />
             <flux:input wire:model="numberDigits" label="Sequence digits" type="number" min="1" max="12" required />
             <flux:checkbox wire:model="resetYearly" label="Reset sequence each year" />
+        </section>
+
+        <section class="grid gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900 md:grid-cols-2">
+            <flux:heading class="md:col-span-2">Quotations</flux:heading>
+            <flux:input wire:model="quotationValidityDays" label="Default validity (days)" type="number" min="1" max="365" required />
+            <flux:textarea wire:model="quotationDefaultTerms" label="Default quotation terms" rows="3" class="md:col-span-2" placeholder="Standard terms or conditions to pre-fill on new quotations…" />
         </section>
 
         <section class="grid gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900 md:grid-cols-2">

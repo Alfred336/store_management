@@ -17,14 +17,17 @@
                 </flux:sidebar.item>
 
                 {{-- Sales --}}
-                @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class) || auth()->user()?->can('viewAny', App\Models\Payment::class) || auth()->user()?->can('pos.use'))
+                @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class) || auth()->user()?->can('viewAny', App\Models\Payment::class) || auth()->user()?->can('pos.use') || auth()->user()?->can('viewAny', App\Models\Quotation::class))
                     <flux:sidebar.group
                         heading="{{ __('Sales') }}"
                         :expandable="true"
-                        :expanded="request()->routeIs('pos.*', 'invoices.*', 'payments.*', 'customers.*')"
+                        :expanded="request()->routeIs('pos.*', 'invoices.*', 'payments.*', 'customers.*', 'quotations.*')"
                     >
                         @can('pos.use')
                             <flux:sidebar.item icon="computer-desktop" :href="route('pos.index')" :current="request()->routeIs('pos.*')" wire:navigate>{{ __('Point of Sale') }}</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', App\Models\Quotation::class)
+                            <flux:sidebar.item icon="document-magnifying-glass" :href="route('quotations.index')" :current="request()->routeIs('quotations.*')" wire:navigate>{{ __('Quotations') }}</flux:sidebar.item>
                         @endcan
                         @can('viewAny', App\Models\Invoice::class)
                             <flux:sidebar.item icon="document-text" :href="route('invoices.index')" :current="request()->routeIs('invoices.*')" wire:navigate>{{ __('Invoices') }}</flux:sidebar.item>

@@ -693,10 +693,10 @@ test('payments at 00:30 and 23:30 EAT both appear for that local day; 02:00 next
     $location = reportLocation();
     $customer = reportCustomer();
 
-    // All timestamps in UTC (EAT = UTC+3)
-    $earlyUtc = Carbon::parse("{$localDate} 00:30:00", $tz)->utc();   // 2026-11-05 21:30 UTC
-    $lateUtc = Carbon::parse("{$localDate} 23:30:00", $tz)->utc();    // 2026-11-06 20:30 UTC
-    $nextUtc = Carbon::parse('2026-11-07 02:00:00', $tz)->utc();      // 2026-11-06 23:00 UTC
+    // All timestamps in EAT (stored directly, no UTC conversion)
+    $early = Carbon::parse("{$localDate} 00:30:00", $tz);   // 2026-11-06 00:30 EAT
+    $late = Carbon::parse("{$localDate} 23:30:00", $tz);    // 2026-11-06 23:30 EAT
+    $next = Carbon::parse('2026-11-07 02:00:00', $tz);      // 2026-11-07 02:00 EAT
 
     $user = User::factory()->create();
 
@@ -717,9 +717,9 @@ test('payments at 00:30 and 23:30 EAT both appear for that local day; 02:00 next
         return $pay;
     };
 
-    $makePayment('100.00', $earlyUtc);  // 00:30 EAT — should appear
-    $makePayment('200.00', $lateUtc);   // 23:30 EAT — should appear
-    $makePayment('300.00', $nextUtc);   // next day 02:00 EAT — must NOT appear
+    $makePayment('100.00', $early);  // 00:30 EAT — should appear
+    $makePayment('200.00', $late);   // 23:30 EAT — should appear
+    $makePayment('300.00', $next);   // next day 02:00 EAT — must NOT appear
 
     $from = Carbon::parse($localDate, $tz)->startOfDay();
     $to = Carbon::parse($localDate, $tz)->endOfDay();
@@ -738,9 +738,10 @@ test('pos sessions opened at 00:30 and 23:30 EAT appear for that local day; 02:0
 
     $location = reportLocation();
 
-    $earlyUtc = Carbon::parse("{$localDate} 00:30:00", $tz)->utc();
-    $lateUtc = Carbon::parse("{$localDate} 23:30:00", $tz)->utc();
-    $nextUtc = Carbon::parse('2026-11-07 02:00:00', $tz)->utc();
+    // All timestamps in EAT (stored directly, no UTC conversion)
+    $early = Carbon::parse("{$localDate} 00:30:00", $tz);   // 2026-11-06 00:30 EAT
+    $late = Carbon::parse("{$localDate} 23:30:00", $tz);    // 2026-11-06 23:30 EAT
+    $next = Carbon::parse('2026-11-07 02:00:00', $tz);      // 2026-11-07 02:00 EAT
 
     // Three different users to avoid the one-open-session-per-user partial unique index
     $u1 = User::factory()->create();
@@ -751,19 +752,19 @@ test('pos sessions opened at 00:30 and 23:30 EAT appear for that local day; 02:0
 
     $id1 = DB::table('pos_sessions')->insertGetId([
         'user_id' => $u1->id, 'location_id' => $loc->id,
-        'opened_at' => $earlyUtc->toDateTimeString(), 'opening_cash' => '0.00',
-        'status' => 'closed', 'closed_at' => $earlyUtc->copy()->addHours(8)->toDateTimeString(),
+        'opened_at' => $early->toDateTimeString(), 'opening_cash' => '0.00',
+        'status' => 'closed', 'closed_at' => $early->copy()->addHours(8)->toDateTimeString(),
         'created_at' => now()->toDateTimeString(), 'updated_at' => now()->toDateTimeString(),
     ]);
     $id2 = DB::table('pos_sessions')->insertGetId([
         'user_id' => $u2->id, 'location_id' => $loc->id,
-        'opened_at' => $lateUtc->toDateTimeString(), 'opening_cash' => '0.00',
-        'status' => 'closed', 'closed_at' => $lateUtc->copy()->addHours(2)->toDateTimeString(),
+        'opened_at' => $late->toDateTimeString(), 'opening_cash' => '0.00',
+        'status' => 'closed', 'closed_at' => $late->copy()->addHours(2)->toDateTimeString(),
         'created_at' => now()->toDateTimeString(), 'updated_at' => now()->toDateTimeString(),
     ]);
     $id3 = DB::table('pos_sessions')->insertGetId([
         'user_id' => $u3->id, 'location_id' => $loc->id,
-        'opened_at' => $nextUtc->toDateTimeString(), 'opening_cash' => '0.00',
+        'opened_at' => $next->toDateTimeString(), 'opening_cash' => '0.00',
         'status' => 'open',
         'created_at' => now()->toDateTimeString(), 'updated_at' => now()->toDateTimeString(),
     ]);
@@ -787,9 +788,10 @@ test('voided invoices at 00:30 and 23:30 EAT appear for that local day; 02:00 ne
     $customer = reportCustomer();
     $creator = User::factory()->create();
 
-    $earlyUtc = Carbon::parse("{$localDate} 00:30:00", $tz)->utc();
-    $lateUtc = Carbon::parse("{$localDate} 23:30:00", $tz)->utc();
-    $nextUtc = Carbon::parse('2026-11-07 02:00:00', $tz)->utc();
+    // All timestamps in EAT (stored directly, no UTC conversion)
+    $early = Carbon::parse("{$localDate} 00:30:00", $tz);   // 2026-11-06 00:30 EAT
+    $late = Carbon::parse("{$localDate} 23:30:00", $tz);    // 2026-11-06 23:30 EAT
+    $next = Carbon::parse('2026-11-07 02:00:00', $tz);      // 2026-11-07 02:00 EAT
 
     $makeVoid = function (Carbon $voidedAt) use ($customer, $location, $creator): Invoice {
         return Invoice::forceCreate([
@@ -812,9 +814,9 @@ test('voided invoices at 00:30 and 23:30 EAT appear for that local day; 02:00 ne
         ]);
     };
 
-    $v1 = $makeVoid($earlyUtc);  // 00:30 EAT — should appear
-    $v2 = $makeVoid($lateUtc);   // 23:30 EAT — should appear
-    $v3 = $makeVoid($nextUtc);   // next day 02:00 EAT — must NOT appear
+    $v1 = $makeVoid($early);  // 00:30 EAT — should appear
+    $v2 = $makeVoid($late);   // 23:30 EAT — should appear
+    $v3 = $makeVoid($next);   // next day 02:00 EAT — must NOT appear
 
     $from = Carbon::parse($localDate, $tz)->startOfDay();
     $to = Carbon::parse($localDate, $tz)->endOfDay();
@@ -826,3 +828,143 @@ test('voided invoices at 00:30 and 23:30 EAT appear for that local day; 02:00 ne
     expect($ids)->toContain($v2->id);
     expect($ids)->not->toContain($v3->id);
 });
+
+// ─── Fine-grained boundary dataset (00:05 / 02:30 / 12:00 / 23:55 / next-day 00:05) ───
+
+dataset('voided_at_boundaries', [
+    'just_after_midnight_00:05' => ['2026-11-10 00:05:00', true],
+    'DST_safe_02:30' => ['2026-11-10 02:30:00', true],
+    'midday_12:00' => ['2026-11-10 12:00:00', true],
+    'just_before_midnight_23:55' => ['2026-11-10 23:55:00', true],
+    'next_day_00:05' => ['2026-11-11 00:05:00', false],
+]);
+
+it('voided invoice: local-day boundary at every EAT boundary time', function (string $localTimestamp, bool $shouldAppear) {
+    $tz = 'Africa/Dar_es_Salaam';
+    $queryDate = '2026-11-10';
+
+    $location = reportLocation();
+    $customer = reportCustomer();
+    $creator = User::factory()->create();
+
+    $invoice = Invoice::forceCreate([
+        'number' => 'TZ-BND-'.random_int(1, 99999),
+        'channel' => 'invoice',
+        'status' => InvoiceStatus::Void,
+        'customer_id' => $customer->id,
+        'location_id' => $location->id,
+        'issue_date' => '2026-11-01',
+        'voided_at' => Carbon::parse($localTimestamp, $tz)->toDateTimeString(),
+        'void_reason' => 'boundary dataset test',
+        'currency' => 'TZS',
+        'prices_include_tax' => false,
+        'subtotal' => '100.00',
+        'discount_total' => '0.00',
+        'tax_total' => '0.00',
+        'total' => '100.00',
+        'amount_paid' => '0.00',
+        'created_by' => $creator->id,
+    ]);
+
+    $from = Carbon::parse($queryDate, $tz)->startOfDay();
+    $to = Carbon::parse($queryDate, $tz)->endOfDay();
+
+    $ids = app(VoidedInvoicesService::class)
+        ->paginate($from, $to, $location->id, 50)
+        ->pluck('id')
+        ->map(fn ($v) => (int) $v)
+        ->all();
+
+    if ($shouldAppear) {
+        expect($ids)->toContain($invoice->id);
+    } else {
+        expect($ids)->not->toContain($invoice->id);
+    }
+})->with('voided_at_boundaries');
+
+dataset('payment_received_at_boundaries', [
+    'just_after_midnight_00:05' => ['2026-11-10 00:05:00', true],
+    'DST_safe_02:30' => ['2026-11-10 02:30:00', true],
+    'midday_12:00' => ['2026-11-10 12:00:00', true],
+    'just_before_midnight_23:55' => ['2026-11-10 23:55:00', true],
+    'next_day_00:05' => ['2026-11-11 00:05:00', false],
+]);
+
+it('payment received_at: local-day boundary at every EAT boundary time', function (string $localTimestamp, bool $shouldAppear) {
+    $tz = 'Africa/Dar_es_Salaam';
+    $queryDate = '2026-11-10';
+
+    $location = reportLocation();
+    $customer = reportCustomer();
+    $user = User::factory()->create();
+
+    $inv = reportInvoice($customer, $location, '50.00', '0.00', '0.00', InvoiceStatus::Issued, $queryDate);
+    $pay = Payment::forceCreate([
+        'number' => 'TZ-BND-'.random_int(1, 99999),
+        'customer_id' => $customer->id,
+        'method' => 'cash',
+        'amount' => '50.00',
+        'received_at' => Carbon::parse($localTimestamp, $tz)->toDateTimeString(),
+        'received_by' => $user->id,
+        'status' => 'active',
+        'idempotency_key' => (string) Str::uuid(),
+    ]);
+    PaymentAllocation::forceCreate(['payment_id' => $pay->id, 'invoice_id' => $inv->id, 'amount' => '50.00']);
+
+    $from = Carbon::parse($queryDate, $tz)->startOfDay();
+    $to = Carbon::parse($queryDate, $tz)->endOfDay();
+
+    $result = app(PaymentsByMethodService::class)->get($from, $to, $location->id);
+    $cashRow = $result['rows']->firstWhere('method', 'cash');
+
+    if ($shouldAppear) {
+        expect($cashRow)->not->toBeNull();
+        expect((int) $cashRow->payment_count)->toBe(1);
+    } else {
+        expect($cashRow)->toBeNull();
+    }
+})->with('payment_received_at_boundaries');
+
+dataset('pos_opened_at_boundaries', [
+    'just_after_midnight_00:05' => ['2026-11-10 00:05:00', true],
+    'DST_safe_02:30' => ['2026-11-10 02:30:00', true],
+    'midday_12:00' => ['2026-11-10 12:00:00', true],
+    'just_before_midnight_23:55' => ['2026-11-10 23:55:00', true],
+    'next_day_00:05' => ['2026-11-11 00:05:00', false],
+]);
+
+it('pos session opened_at: local-day boundary at every EAT boundary time', function (string $localTimestamp, bool $shouldAppear) {
+    $tz = 'Africa/Dar_es_Salaam';
+    $queryDate = '2026-11-10';
+
+    $loc = reportLocation();
+    $user = User::factory()->create();
+
+    $openedAt = Carbon::parse($localTimestamp, $tz);
+
+    $sessionId = DB::table('pos_sessions')->insertGetId([
+        'user_id' => $user->id,
+        'location_id' => $loc->id,
+        'opened_at' => $openedAt->toDateTimeString(),
+        'opening_cash' => '0.00',
+        'status' => 'closed',
+        'closed_at' => $openedAt->copy()->addHour()->toDateTimeString(),
+        'created_at' => now()->toDateTimeString(),
+        'updated_at' => now()->toDateTimeString(),
+    ]);
+
+    $from = Carbon::parse($queryDate, $tz)->startOfDay();
+    $to = Carbon::parse($queryDate, $tz)->endOfDay();
+
+    $ids = app(PosSessionsService::class)
+        ->paginate($from, $to, $loc->id, 50)
+        ->pluck('id')
+        ->map(fn ($v) => (int) $v)
+        ->all();
+
+    if ($shouldAppear) {
+        expect($ids)->toContain($sessionId);
+    } else {
+        expect($ids)->not->toContain($sessionId);
+    }
+})->with('pos_opened_at_boundaries');

@@ -4,6 +4,7 @@ use App\Http\Controllers\Customers\CustomerExportController;
 use App\Http\Controllers\Customers\CustomerStatementController;
 use App\Http\Controllers\InvoicePdfController;
 use App\Http\Controllers\PaymentReceiptController;
+use App\Http\Controllers\QuotationPdfController;
 use App\Http\Controllers\Reports\ReportPdfController;
 use App\Livewire\Auth\ChangePassword;
 use App\Livewire\Categories\Index as CategoriesIndex;
@@ -15,6 +16,7 @@ use App\Livewire\Invoicing\Index as InvoicingIndex;
 use App\Livewire\Locations\Index as LocationsIndex;
 use App\Livewire\Payments\Index as PaymentsIndex;
 use App\Livewire\Products\Index as ProductsIndex;
+use App\Livewire\Quotations\Index as QuotationsIndex;
 use App\Livewire\Reports\Inventory\Index as ReportInventoryIndex;
 use App\Livewire\Reports\Payments\Index as ReportPaymentsIndex;
 use App\Livewire\Reports\PosSessions\Index as ReportPosSessionsIndex;
@@ -73,6 +75,10 @@ Route::middleware(['auth'])->group(function (): void {
 
     // Point of Sale.
     Route::livewire('pos', PosIndex::class)->name('pos.index');
+
+    // Quotations: list and PDF render.
+    Route::livewire('quotations', QuotationsIndex::class)->name('quotations.index');
+    Route::get('quotations/{quotation}/pdf', QuotationPdfController::class)->name('quotations.pdf');
 
     // Administration: user management.
     Route::livewire('admin/users', UsersIndex::class)->name('users.index');

@@ -55,6 +55,7 @@ class Invoice extends Model
 {
     protected $fillable = [
         'number', 'channel', 'status', 'customer_id', 'location_id', 'pos_session_id',
+        'quotation_id',
         'issue_date', 'due_date', 'currency', 'prices_include_tax',
         'subtotal', 'discount_total', 'tax_total', 'total', 'amount_paid',
         'notes', 'terms', 'template_key',
@@ -135,6 +136,12 @@ class Invoice extends Model
     public function paymentAllocations(): HasMany
     {
         return $this->hasMany(PaymentAllocation::class);
+    }
+
+    /** @return BelongsTo<Quotation, $this> */
+    public function quotation(): BelongsTo
+    {
+        return $this->belongsTo(Quotation::class);
     }
 
     /**

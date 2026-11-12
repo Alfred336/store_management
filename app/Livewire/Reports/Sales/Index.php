@@ -25,9 +25,8 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.view'), 403);
 
-        $tz = 'Africa/Dar_es_Salaam';
-        $this->dateFrom = now($tz)->startOfMonth()->toDateString();
-        $this->dateTo = now($tz)->endOfMonth()->toDateString();
+        $this->dateFrom = now()->startOfMonth()->toDateString();
+        $this->dateTo = now()->endOfMonth()->toDateString();
     }
 
     public function exportXlsx(): BinaryFileResponse
@@ -56,9 +55,8 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.view'), 403);
 
-        $tz = 'Africa/Dar_es_Salaam';
-        $from = Carbon::parse($this->dateFrom, $tz)->startOfDay();
-        $to = Carbon::parse($this->dateTo, $tz)->endOfDay();
+        $from = Carbon::parse($this->dateFrom)->startOfDay();
+        $to = Carbon::parse($this->dateTo)->endOfDay();
 
         $locationId = $this->locationFilter !== '' ? (int) $this->locationFilter : null;
         $data = $service->get($from, $to, $locationId);

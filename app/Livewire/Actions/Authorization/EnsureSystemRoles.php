@@ -39,6 +39,9 @@ class EnsureSystemRoles
             'reports.view', 'reports.export',
             'users.view', 'users.create', 'users.update', 'users.deactivate', 'users.reset_password', 'users.delete',
             'audit.view',
+            // Quotations
+            'quotations.view', 'quotations.create', 'quotations.update', 'quotations.send',
+            'quotations.convert', 'quotations.delete', 'quotations.print', 'quotations.approve_discount',
         ]);
         $cashierPermissions = [
             'dashboard.view', 'products.view', 'categories.view', 'units.view', 'locations.view',
@@ -47,6 +50,7 @@ class EnsureSystemRoles
             'payments.view', 'payments.create',
             'pos.use', 'pos.open_session', 'pos.close_session', 'pos.discount', 'pos.credit_sale',
             'inventory.view',
+            'quotations.view', 'quotations.create', 'quotations.update', 'quotations.send', 'quotations.convert', 'quotations.print',
         ];
 
         foreach ($allPermissions as $permission) {
@@ -55,9 +59,9 @@ class EnsureSystemRoles
 
         $roles = [
             'Admin' => $allPermissions,
-            'Storekeeper' => array_merge($managePermissions, ['dashboard.view', 'invoices.view', 'invoices.print', 'inventory.view', 'inventory.receive', 'inventory.adjust', 'inventory.transfer', 'reports.view']),
+            'Storekeeper' => array_merge($managePermissions, ['dashboard.view', 'invoices.view', 'invoices.print', 'inventory.view', 'inventory.receive', 'inventory.adjust', 'inventory.transfer', 'reports.view', 'quotations.view']),
             'Cashier' => $cashierPermissions,
-            'Viewer' => array_merge($viewPermissions, ['dashboard.view', 'invoices.view', 'payments.view', 'inventory.view', 'reports.view']),
+            'Viewer' => array_merge($viewPermissions, ['dashboard.view', 'invoices.view', 'payments.view', 'inventory.view', 'reports.view', 'quotations.view']),
         ];
 
         foreach ($roles as $name => $permissions) {

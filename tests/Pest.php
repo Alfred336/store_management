@@ -3,6 +3,7 @@
 use App\Livewire\Actions\Customers\EnsureWalkInCustomer;
 use App\Models\Customer;
 use App\Services\Setup\SetupStatus;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -23,6 +24,14 @@ pest()->extend(TestCase::class)
 
 beforeEach(function (): void {
     app(SetupStatus::class)->forget();
+
+    if ($testNow = env('TEST_NOW')) {
+        Carbon::setTestNow(Carbon::parse($testNow));
+    }
+});
+
+afterEach(function (): void {
+    Carbon::setTestNow();
 });
 
 /*

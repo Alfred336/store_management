@@ -12,10 +12,9 @@ class PosSessionsService
     /** @return LengthAwarePaginator<int, \stdClass> */
     public function paginate(Carbon $from, Carbon $to, ?int $locationId = null, int $perPage = 50): LengthAwarePaginator
     {
-        // Convert EAT boundaries to UTC for half-open range comparison against
-        // opened_at (timestamp without time zone, stored in UTC).
-        $startUtc = $from->copy()->utc()->toDateTimeString();
-        $endUtc = $to->copy()->addSecond()->utc()->toDateTimeString();
+        // Half-open range against opened_at (stored in app local time).
+        $start = $from->toDateTimeString();
+        $end = $to->copy()->addSecond()->toDateTimeString();
 
         return DB::table('pos_sessions')
             ->join('users', 'users.id', '=', 'pos_sessions.user_id')
@@ -35,8 +34,8 @@ class PosSessionsService
                 'locations.name AS location_name',
                 'closed_by_user.name AS closed_by_name',
             ])
-            ->where('pos_sessions.opened_at', '>=', $startUtc)
-            ->where('pos_sessions.opened_at', '<', $endUtc)
+            ->where('pos_sessions.opened_at', '>=', $start)
+            ->where('pos_sessions.opened_at', '<', $end)
             ->when($locationId !== null, fn ($q) => $q->where('pos_sessions.location_id', $locationId))
             ->orderBy('pos_sessions.opened_at', 'desc')
             ->paginate($perPage);

@@ -40,7 +40,13 @@ class Index extends Component
 
     public string $paymentPrefix = 'PAY';
 
+    public string $quotationPrefix = 'QUO';
+
     public bool $resetYearly = true;
+
+    public string $quotationValidityDays = '14';
+
+    public string $quotationDefaultTerms = '';
 
     public string $numberDigits = '6';
 
@@ -72,7 +78,10 @@ class Index extends Component
         $this->invoicePrefix = (string) $settings->get('numbering.invoice_prefix', 'INV');
         $this->receiptPrefix = (string) $settings->get('numbering.receipt_prefix', 'RCT');
         $this->paymentPrefix = (string) $settings->get('numbering.payment_prefix', 'PAY');
+        $this->quotationPrefix = (string) $settings->get('numbering.quotation_prefix', 'QUO');
         $this->resetYearly = (bool) $settings->get('numbering.reset_yearly', true);
+        $this->quotationValidityDays = (string) $settings->get('quotations.validity_days', '14');
+        $this->quotationDefaultTerms = (string) $settings->get('quotations.default_terms', '');
         $this->numberDigits = (string) $settings->get('numbering.digits', '6');
         $this->creditLimitMode = (string) $settings->get('customers.credit_limit_mode', 'warn');
         $this->bankDetails = (string) $settings->get('business.bank_details', '');
@@ -99,8 +108,11 @@ class Index extends Component
             'invoicePrefix' => ['required', 'string', 'max:12', 'alpha:upper'],
             'receiptPrefix' => ['required', 'string', 'max:12', 'alpha:upper'],
             'paymentPrefix' => ['required', 'string', 'max:12', 'alpha:upper'],
+            'quotationPrefix' => ['required', 'string', 'max:12', 'alpha:upper'],
             'resetYearly' => ['required', 'boolean'],
             'numberDigits' => ['required', 'integer', 'between:1,12'],
+            'quotationValidityDays' => ['required', 'integer', 'between:1,365'],
+            'quotationDefaultTerms' => ['nullable', 'string', 'max:2000'],
             'creditLimitMode' => ['required', Rule::in(['warn', 'block'])],
             'bankDetails' => ['nullable', 'string', 'max:1000'],
             'footerTerms' => ['nullable', 'string', 'max:1000'],
@@ -122,8 +134,11 @@ class Index extends Component
             'invoice_prefix' => $data['invoicePrefix'],
             'receipt_prefix' => $data['receiptPrefix'],
             'payment_prefix' => $data['paymentPrefix'],
+            'quotation_prefix' => $data['quotationPrefix'],
             'reset_yearly' => (bool) $data['resetYearly'],
             'number_digits' => (int) $data['numberDigits'],
+            'quotation_validity_days' => (int) $data['quotationValidityDays'],
+            'quotation_default_terms' => $data['quotationDefaultTerms'] ?: null,
             'credit_limit_mode' => $data['creditLimitMode'],
             'bank_details' => $data['bankDetails'] ?: null,
             'footer_terms' => $data['footerTerms'] ?: null,

@@ -171,3 +171,42 @@ Run code formatting and style fixes:
 - **Stock**: Insufficient stock throws `InsufficientStockException`.
 - **Held Sales**: `HoldSale` saves the cart without touching stock or numbering; `ResumeSale` restores the cart and deletes the held record; `voidHeldSale` deletes the record via Livewire.
 - **Authorization**: Route returns 403 for user without `pos.use`.
+
+### 12. Quotations Suite (`tests/Feature/Quotations/`)
+
+#### `QuotationModuleTest.php`
+
+- **Draft creation**: Totals correct (subtotal, discount, VAT, total); packaging-unit `base_quantity` = qty × factor; `revision = 1`; number null; `created_by` set.
+- **Edited price kept**: Explicitly provided `unit_price` is stored verbatim on create and update.
+- **Prospect-only quotation**: Allowed when `customer_id` is null and `prospect_name` is provided; customer-less draft without prospect_name throws `ValidationException`.
+- **Discount above limit**: Exceeds `pos.max_discount_percent` without `quotations.approve_discount` → `AuthorizationException`. With the permission → succeeds.
+- **Send**: Assigns a `QUO-…` sequence number, transitions to `sent`, records `sent_by` / `sent_at`, snapshots customer or prospect details. Sending a sent quotation is impossible (policy blocks with `AuthorizationException`).
+- **Immutability**: Policy returns `false` for update/delete on non-draft quotations → `AuthorizationException` (not `ValidationException`).
+- **Expiry (computed)**: `valid_until` yesterday → `isExpired()` true, `displayStatus()` = `'expired'`. Accept or convert refused via `AuthorizationException` (policy guards).
+- **Accept / Reject**: Transitions verified; `accepted_at` / `rejected_at` / `reject_reason` stored.
+- **Revise**: Creates revision 2 with `revised_from_id`; original unchanged at revision 1 and status `sent`. Works from rejected and expired quotations. When original `valid_until` is in the past, revision gets `today + validity_days` to satisfy the DB CHECK constraint.
+- **Convert**: Creates one `Invoice` draft with channel `invoice`, `quotation_id` set, quoted prices verbatim, customer carried. Second convert refused (`AuthorizationException`). Prospect quotation refuses without a registered customer; succeeds with one.
+- **No stock movement**: Stock levels and movement count are unchanged through draft → send → convert steps; only `IssueInvoice` deducts stock.
+- **Issue converted invoice**: Deducts stock and runs credit check; insufficient stock throws `InsufficientStockException`.
+- **Permissions**: Viewer cannot create; Storekeeper cannot send; Viewer cannot convert — all via `AuthorizationException`.
+
+#### `QuotationDocumentTest.php`
+
+- **Classic template**: Renders `%PDF` bytes and HTML contains "This is not a tax invoice.".
+- **All 4 templates × paper**: `classic/A4`, `modern/A4`, `minimal/A4`, `compact/A5` — all render valid PDF and include the not-a-tax-invoice notice.
+- **DRAFT watermark**: Draft quotation view-model has `watermark = 'DRAFT'`; template renders "DRAFT".
+- **EXPIRED watermark**: Expired sent quotation view-model has `watermark = 'EXPIRED'`.
+- **PDF controller**: Returns `200 application/pdf` starting with `%PDF`; rejects `thermal` template with 422; returns 403 without `quotations.print`.
+- **Email**: `Mail::fake()` confirms one `QuotationMail` sent with the correct PDF filename as attachment.
+- **Envelope subject**: Contains the QUO sequence number (not "Draft") after the quotation is sent.
+
+#### `QuotationScreenTest.php`
+
+- **List**: Renders customer name and status badge; denied without `quotations.view`; search and status filters work.
+- **Modal dispatches** (via `assertDispatched`): `openForm` → `modal-show quotation-form`; `closeForm` → `modal-close quotation-form`; `show` → `modal-show quotation-details`; `confirmDelete` → `modal-show quotation-delete`; `openSendConfirmation` → `modal-show quotation-send`; `openEmailPanel` → `modal-show quotation-email`; `openConvertPanel` → `modal-show quotation-convert`.
+- **Store**: Creates a draft via the Livewire form; dispatches `modal-close`; empty items array shows validation errors.
+- **Delete**: `deleteDraft` removes quotation and dispatches `modal-close quotation-delete`.
+- **Send**: `sendQuotation` transitions to sent and dispatches `modal-close quotation-send`.
+- **Accept / Reject**: `applyStatus('accept')` sets status `accepted`; `applyStatus('reject')` with reason stores `reject_reason`.
+- **Revise**: `revise` creates a new draft with `revised_from_id` pointing to the sent original.
+- **Convert**: `convertToInvoice` on a registered-customer quotation sets status to `converted`.

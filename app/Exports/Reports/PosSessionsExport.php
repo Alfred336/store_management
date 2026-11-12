@@ -20,9 +20,8 @@ class PosSessionsExport implements FromCollection, WithHeadings, WithMapping
     /** @return Collection<int, \stdClass> */
     public function collection(): Collection
     {
-        $tz = 'Africa/Dar_es_Salaam';
-        $startUtc = Carbon::parse($this->dateFrom, $tz)->startOfDay()->utc()->toDateTimeString();
-        $endUtc = Carbon::parse($this->dateTo, $tz)->addDay()->startOfDay()->utc()->toDateTimeString();
+        $start = Carbon::parse($this->dateFrom)->startOfDay()->toDateTimeString();
+        $end = Carbon::parse($this->dateTo)->addDay()->startOfDay()->toDateTimeString();
 
         return DB::table('pos_sessions')
             ->join('users', 'users.id', '=', 'pos_sessions.user_id')
@@ -41,8 +40,8 @@ class PosSessionsExport implements FromCollection, WithHeadings, WithMapping
                 'locations.name AS location_name',
                 'closed_by_user.name AS closed_by_name',
             ])
-            ->where('pos_sessions.opened_at', '>=', $startUtc)
-            ->where('pos_sessions.opened_at', '<', $endUtc)
+            ->where('pos_sessions.opened_at', '>=', $start)
+            ->where('pos_sessions.opened_at', '<', $end)
             ->when($this->locationId !== null, fn ($q) => $q->where('pos_sessions.location_id', $this->locationId))
             ->orderBy('pos_sessions.opened_at', 'desc')
             ->get();

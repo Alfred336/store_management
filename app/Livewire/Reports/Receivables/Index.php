@@ -20,7 +20,7 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.view'), 403);
 
-        $this->asOf = now('Africa/Dar_es_Salaam')->toDateString();
+        $this->asOf = now()->toDateString();
     }
 
     public function exportXlsx(): BinaryFileResponse
@@ -49,7 +49,7 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.view'), 403);
 
-        $asOf = Carbon::parse($this->asOf, 'Africa/Dar_es_Salaam')->endOfDay();
+        $asOf = Carbon::parse($this->asOf)->endOfDay();
         $data = $service->get($asOf);
 
         return view('livewire.reports.receivables.index', [

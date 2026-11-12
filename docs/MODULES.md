@@ -158,4 +158,31 @@
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:
   - Key-value JSON settings store for company profile, currency, VAT rate, tax inclusion, credit limit enforcement mode, invoice printing defaults (`invoicing.default_template`, `invoicing.default_paper`, `pos.receipt_width`), and document footer (`business.bank_details`, `business.footer_terms`).
-  - Atomic sequence allocation per document type (`invoice`, `receipt`, `payment`, `customer`) and year.
+  - Atomic sequence allocation per document type (`invoice`, `receipt`, `payment`, `customer`, `quotation`) and year.
+  - Quotation settings: `quotations.validity_days`, `quotations.default_terms`, `numbering.quotation_prefix`.
+
+## 13. Quotations (Phase 3C)
+
+- **Location**: `app/Livewire/Quotations/Index.php`, `app/Livewire/Actions/Quotations/`, `app/Models/Quotation.php`, `app/Models/QuotationItem.php`, `app/Policies/QuotationPolicy.php`, `app/Services/Quotations/QuotationDocumentData.php`, `app/Http/Controllers/QuotationPdfController.php`, `app/Mail/QuotationMail.php`
+- **Status lifecycle**: `draft` → `sent` → `accepted` | `rejected` | `converted`. "Expired" is a computed overlay (status = sent AND `valid_until` < today), never stored.
+- **Actions** (all in `app/Livewire/Actions/Quotations/`):
+  - `CreateQuotationDraft`: Requires either `customer_id` or `prospect_name`. Validates unit membership, quantities, prices, and discount limits. Calculates per-line VAT and document totals. Defaults `unit_price` to `selling_price × packaging factor`.
+  - `UpdateQuotationDraft`: Atomically replaces items and recalculates totals for draft-only quotations.
+  - `DeleteQuotationDraft`: Deletes the quotation and cascades items; drafts only.
+  - `SendQuotation`: Assigns a `QUO-…` sequence number via `DocumentNumberingService`, snapshots customer/prospect name + phone + address, sets `status = sent`. Immutable after.
+  - `AcceptQuotation`: Transitions sent (non-expired) quotation to `accepted`; sets `accepted_at`.
+  - `RejectQuotation`: Transitions sent (non-expired) quotation to `rejected`; sets `rejected_at` and optional `reject_reason`.
+  - `ReviseQuotation`: Creates a new DRAFT with `revision + 1` and `revised_from_id` pointing to the original. Copies all items verbatim. Original is left unchanged for history. When original `valid_until` is in the past the new draft gets `today + quotations.validity_days`.
+  - `ConvertQuotationToInvoice`: Requires a registered (non-walk-in) customer; refuses if expired or already converted. Re-calculates totals from stored quoted prices. Creates an `Invoice` draft with `channel = invoice` and `quotation_id` FK. No stock movement until `IssueInvoice` is called.
+- **PDF**:
+  - Four templates: `classic`, `modern`, `minimal`, `compact` (all include "This is not a tax invoice." notice; no thermal).
+  - `QuotationDocumentData` builds the view-model: company (from Settings), header, recipient (snapshot for sent, live for drafts), line items, totals with amount-in-words, watermark (DRAFT/EXPIRED/null).
+  - `QuotationPdfController` (`GET /quotations/{quotation}/pdf`): authorizes `quotations.print`; rejects `thermal`; streams inline or as download.
+- **Email**: `QuotationMail` — synchronous (no queue). PDF bytes passed as constructor argument and attached via `Attachment::fromData()`.
+- **Screen** (`/quotations`): List with search, status/date/customer/location filters, sortable columns. Create/edit flyout (registered customer picker OR prospect fields). Send, accept, reject, revise, convert, and email action panels. All modals use `modal-show` / `modal-close` Livewire dispatch events.
+- **Permissions**: `quotations.view` (all roles), `quotations.create` / `quotations.update` / `quotations.send` / `quotations.convert` / `quotations.print` (Admin + Cashier), `quotations.delete` / `quotations.approve_discount` (Admin only).
+- **Invariants**:
+  - No stock movement at any stage of the quotation lifecycle; stock is only deducted when the converted invoice is issued via `IssueInvoice`.
+  - Issued invoices carry quoted prices verbatim — authorized by the `quotations.convert` permission check and isolated from the POS pricing rule (which uses `CompletePosSale`).
+  - `valid_until >= quote_date` enforced by a database CHECK constraint.
+  - Sequence number is assigned exactly once at send time and never changes.

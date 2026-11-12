@@ -11,6 +11,7 @@ use App\Models\Invoice;
 use App\Models\Location;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\Quotation;
 use App\Models\Setting;
 use App\Models\Unit;
 use App\Models\User;
@@ -20,6 +21,7 @@ use App\Policies\InvoicePolicy;
 use App\Policies\LocationPolicy;
 use App\Policies\PaymentPolicy;
 use App\Policies\ProductPolicy;
+use App\Policies\QuotationPolicy;
 use App\Policies\SettingPolicy;
 use App\Policies\UnitPolicy;
 use App\Policies\UserPolicy;
@@ -70,6 +72,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Location::class, LocationPolicy::class);
         Gate::policy(Payment::class, PaymentPolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
+        Gate::policy(Quotation::class, QuotationPolicy::class);
         Gate::policy(Setting::class, SettingPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
     }

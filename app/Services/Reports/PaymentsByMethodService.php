@@ -14,18 +14,17 @@ class PaymentsByMethodService
      */
     public function get(Carbon $from, Carbon $to, ?int $locationId = null): array
     {
-        // Convert EAT boundaries to UTC for half-open range comparison against
-        // the timestamp column (stored in UTC, app.timezone = UTC).
-        $startUtc = $from->copy()->utc()->toDateTimeString();
-        $endUtc = $to->copy()->addSecond()->utc()->toDateTimeString();
+        // Half-open range against received_at (stored in app local time).
+        $start = $from->toDateTimeString();
+        $end = $to->copy()->addSecond()->toDateTimeString();
 
         $rows = DB::table('payments')
             ->selectRaw('payments.method')
             ->selectRaw('COUNT(*) AS payment_count')
             ->selectRaw('SUM(payments.amount) AS amount')
             ->where('payments.status', 'active')
-            ->where('payments.received_at', '>=', $startUtc)
-            ->where('payments.received_at', '<', $endUtc)
+            ->where('payments.received_at', '>=', $start)
+            ->where('payments.received_at', '<', $end)
             ->when($locationId !== null, fn ($q) => $q->whereExists(function ($sub) use ($locationId): void {
                 // A payment's location is determined by the invoices it was allocated to.
                 // This covers both back-office and POS payments uniformly.

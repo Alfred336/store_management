@@ -20,17 +20,16 @@ class PaymentsByMethodExport implements FromCollection, WithHeadings, WithMappin
     /** @return Collection<int, \stdClass> */
     public function collection(): Collection
     {
-        $tz = 'Africa/Dar_es_Salaam';
-        $startUtc = Carbon::parse($this->dateFrom, $tz)->startOfDay()->utc()->toDateTimeString();
-        $endUtc = Carbon::parse($this->dateTo, $tz)->addDay()->startOfDay()->utc()->toDateTimeString();
+        $start = Carbon::parse($this->dateFrom)->startOfDay()->toDateTimeString();
+        $end = Carbon::parse($this->dateTo)->addDay()->startOfDay()->toDateTimeString();
 
         return DB::table('payments')
             ->selectRaw('payments.method')
             ->selectRaw('COUNT(*) AS payment_count')
             ->selectRaw('SUM(payments.amount) AS amount')
             ->where('payments.status', 'active')
-            ->where('payments.received_at', '>=', $startUtc)
-            ->where('payments.received_at', '<', $endUtc)
+            ->where('payments.received_at', '>=', $start)
+            ->where('payments.received_at', '<', $end)
             ->when($this->locationId !== null, fn ($q) => $q->whereExists(function ($sub): void {
                 $sub->from('payment_allocations')
                     ->join('invoices', 'invoices.id', '=', 'payment_allocations.invoice_id')

@@ -16,7 +16,7 @@ class ReceivablesAgingExport implements FromCollection, WithHeadings, WithMappin
 
     public function __construct(string $asOf)
     {
-        $this->asOf = Carbon::parse($asOf, 'Africa/Dar_es_Salaam')->endOfDay();
+        $this->asOf = Carbon::parse($asOf)->endOfDay();
     }
 
     /** @return Collection<int, \stdClass> */
