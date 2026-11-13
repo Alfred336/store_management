@@ -24,6 +24,7 @@ use App\Livewire\Reports\Receivables\Index as ReportReceivablesIndex;
 use App\Livewire\Reports\Sales\Index as ReportSalesIndex;
 use App\Livewire\Reports\Vat\Index as ReportVatIndex;
 use App\Livewire\Reports\VoidedInvoices\Index as ReportVoidedInvoicesIndex;
+use App\Livewire\Roles\Index as RolesIndex;
 use App\Livewire\Sales\Pos\Index as PosIndex;
 use App\Livewire\Settings\Index as BusinessSettingsIndex;
 use App\Livewire\Setup\Index as SetupIndex;
@@ -80,8 +81,9 @@ Route::middleware(['auth'])->group(function (): void {
     Route::livewire('quotations', QuotationsIndex::class)->name('quotations.index');
     Route::get('quotations/{quotation}/pdf', QuotationPdfController::class)->name('quotations.pdf');
 
-    // Administration: user management.
+    // Administration: user management and roles.
     Route::livewire('admin/users', UsersIndex::class)->name('users.index');
+    Route::livewire('admin/roles', RolesIndex::class)->name('roles.index');
 
     // Reports: view screens and PDF export.
     Route::livewire('reports/sales', ReportSalesIndex::class)->name('reports.sales');

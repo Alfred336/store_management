@@ -1,5 +1,33 @@
 # Changelog
 
+## [Phase 7E: Roles & Permissions Management] - 2026-11-13
+
+### Added
+
+- **`config/permissions.php`**: single source of truth listing all 55 permissions grouped across 13 modules (Dashboard, Products, Inventory, Customers, Quotations, Invoices, Payments, POS, Reports, Users, Roles, Settings, Audit). Each permission has `name`, `label`, and `description`. `system_role_defaults` defines the default permission set per system role.
+- **New permissions**: `roles.view`, `roles.create`, `roles.update`, `roles.delete` — Admin only by default.
+- **Migration** `2026_11_13_000001_add_description_customised_at_to_roles_table.php`: adds nullable `roles.description` (text) and `roles.customised_at` (timestamp) columns.
+- **Migration** `2026_11_13_000002_sync_roles_role_permissions.php`: runs `EnsureSystemRoles` to seed the new permissions.
+- **Actions** in `app/Livewire/Actions/Roles/`:
+  - `SaveRolePermissions`: syncs permissions with escalation guards, sets `customised_at`, clears cache.
+  - `CreateRole`: creates a custom role with optional description.
+  - `RenameRole`: renames a custom role (blocked for system roles).
+  - `DeleteRole`: deletes a custom role with no users (blocked for system roles).
+  - `ResetRolePermissions`: restores a system role to catalogue defaults and clears `customised_at`.
+- **`app/Livewire/Roles/Index.php`**: split-panel component at `/admin/roles`. Role list, permission matrix, search, modals (create, rename, delete, save-confirm), users panel.
+- **Views**: `resources/views/livewire/roles/index.blade.php` + 5 partials (role-list, permission-matrix, create-modal, rename-modal, delete-modal, save-confirm-modal).
+- **Route** `GET /admin/roles` → `roles.index`.
+- **Sidebar**: "Roles & Permissions" item (icon `shield-check`) added to the Administration group.
+- **Tests** `tests/Feature/Roles/RolesModuleTest.php`: 30 tests covering catalogue, EnsureSystemRoles, system role guards, save/reset, custom CRUD, privilege escalation, audit log, access control, screen rendering, and modal dispatches.
+
+### Changed
+
+- **`EnsureSystemRoles`**: rewritten to read from `config/permissions.php` instead of hardcoded arrays. Admin always holds all permissions. Uncustomised system roles receive new defaults additively. Customised system roles are left untouched. `Schema::hasColumn('roles', 'customised_at')` guard preserves backwards-compat with pre-7E migrations.
+- **`docs/MODULES.md`**: added Module 11 (Roles & Permissions Management); renumbered former modules 11+ to 12+.
+- **`docs/ROUTING.md`**: added `/admin/roles` row.
+- **`docs/SECURITY.md`**: documented three privilege-escalation rules for `SaveRolePermissions`.
+- **`docs/TESTING.md`**: added Section 13 (Roles & Permissions Suite).
+
 ## [Phase 7D: Permanent User Deletion with Anonymize] - 2026-11-11
 
 ### Added

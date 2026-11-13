@@ -85,14 +85,17 @@
                 @endcan
 
                 {{-- Administration --}}
-                @if(auth()->user()?->can('users.view') || auth()->user()?->can('viewAny', App\Models\Setting::class))
+                @if(auth()->user()?->can('users.view') || auth()->user()?->can('roles.view') || auth()->user()?->can('viewAny', App\Models\Setting::class))
                     <flux:sidebar.group
                         heading="{{ __('Administration') }}"
                         :expandable="true"
-                        :expanded="request()->routeIs('users.*', 'settings.*')"
+                        :expanded="request()->routeIs('users.*', 'roles.*', 'settings.*')"
                     >
                         @can('users.view')
                             <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>{{ __('Users') }}</flux:sidebar.item>
+                        @endcan
+                        @can('roles.view')
+                            <flux:sidebar.item icon="shield-check" :href="route('roles.index')" :current="request()->routeIs('roles.*')" wire:navigate>{{ __('Roles & Permissions') }}</flux:sidebar.item>
                         @endcan
                         @can('viewAny', App\Models\Setting::class)
                             <flux:sidebar.item icon="cog-6-tooth" :href="route('settings.index')" :current="request()->routeIs('settings.*')" wire:navigate>{{ __('Business Settings') }}</flux:sidebar.item>

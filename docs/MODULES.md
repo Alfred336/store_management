@@ -131,7 +131,31 @@
 - **Timezone**: Date boundaries use Africa/Dar_es_Salaam for `voided_at` and POS session `opened_at` date casting; `issue_date` and `received_at` are stored as dates (no TZ conversion needed).
 - **Permissions**: `reports.view` (Admin, Storekeeper, Viewer), `reports.export` (Admin only). Authorized in `mount()` and every export action.
 
-## 11. User Management (Phase 7A)
+## 11. Roles & Permissions Management (Phase 7E)
+
+- **Location**: `app/Livewire/Roles/Index.php`, `app/Livewire/Actions/Roles/`, `config/permissions.php`
+- **Permission Catalogue** (`config/permissions.php`): single source of truth listing every permission grouped by module (13 groups). Each entry carries `name`, `label`, and `description`. `system_role_defaults` maps each system role to its default permission set (`['*']` for Admin).
+- **System roles**: Admin, Storekeeper, Cashier, Viewer. Cannot be renamed or deleted. Admin is always read-only on screen and always holds every catalogue permission. The others can be edited on screen and have a "Reset to defaults" button.
+- **Custom roles**: free CRUD — create with optional description, rename, edit permissions, delete (only when no users hold the role).
+- **`customised_at` column** (on `roles` table): `NULL` = never changed on screen; non-NULL = screen-managed. `EnsureSystemRoles` skips non-Admin system roles where `customised_at IS NOT NULL`.
+- **`EnsureSystemRoles`** (`app/Livewire/Actions/Authorization/EnsureSystemRoles.php`): now catalogue-driven. Admin always gets full sync. For uncustomised system roles: additive only (grants missing defaults; never removes). Includes `Schema::hasColumn('roles', 'customised_at')` guard for backwards-compat with old migrations.
+- **Actions** (all in `app/Livewire/Actions/Roles/`):
+  - `SaveRolePermissions`: syncs permissions, sets `customised_at`, clears cache, writes audit row. Enforces escalation rules (see SECURITY).
+  - `CreateRole`: creates custom role with optional description, clears cache, writes audit row.
+  - `RenameRole`: updates role name via `DB::table`, clears cache, writes audit row. Blocked for system roles.
+  - `DeleteRole`: deletes custom role with no users. Blocked for system roles or roles with users.
+  - `ResetRolePermissions`: syncs back to catalogue defaults, sets `customised_at = null`, clears cache, writes audit row. Only for non-Admin system roles.
+- **Screen** (`/admin/roles`, `roles.index`): split-panel layout — left: role list with System/Custom badge and user count; right: permission matrix grouped by module with checkboxes, label, description, select-all per module, permission search box, users panel. Admin panel is read-only. Save/Reset/Rename/Delete/New role buttons context-sensitive.
+- **Modals**: create-role, rename-role, delete-role, save-confirm (lists removed permissions when role has users).
+- **Privilege escalation guards** (in `SaveRolePermissions`):
+  1. Actor cannot change permissions of a role they hold.
+  2. Non-admins cannot grant permissions they don't have.
+  3. Only Admin can edit roles that hold any `users.*` or `roles.*` permission.
+- **Audit log**: every action writes to `admin_audit_logs` with `actor_id`, `action`, `subject_type`, `subject_id`, and `changes`.
+- **Cache**: `PermissionRegistrar::forgetCachedPermissions()` called after every mutation so changes take effect on the next request.
+- **Permissions**: `roles.view`, `roles.create`, `roles.update`, `roles.delete` — Admin only by default.
+
+## 12. User Management (Phase 7A)
 
 - **Location**: `app/Livewire/Users/Index.php`, `app/Livewire/Actions/Users/`, `app/Models/AdminAuditLog.php`, `app/Policies/UserPolicy.php`, `app/Services/Authorization/AdminAccountProtection.php`
 - **Actions** (all in `app/Livewire/Actions/Users/`):

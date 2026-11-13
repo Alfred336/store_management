@@ -210,3 +210,19 @@ Run code formatting and style fixes:
 - **Accept / Reject**: `applyStatus('accept')` sets status `accepted`; `applyStatus('reject')` with reason stores `reject_reason`.
 - **Revise**: `revise` creates a new draft with `revised_from_id` pointing to the sent original.
 - **Convert**: `convertToInvoice` on a registered-customer quotation sets status to `converted`.
+
+### 13. Roles & Permissions Suite (`tests/Feature/Roles/RolesModuleTest.php`)
+
+- **Catalogue**: 13 module groups present; all permission names unique; every default permission exists in the catalogue.
+- **EnsureSystemRoles**: creates all four system roles; Admin holds every catalogue permission; re-running does NOT undo a screen change to Cashier (`customised_at` respected).
+- **New permissions**: a new catalogue permission reaches Admin on the next run; reaches uncustomised system roles additively; does NOT reach customised system roles.
+- **System role restrictions**: system roles cannot be renamed or deleted (403); Admin role cannot be edited via `SaveRolePermissions` (403).
+- **SaveRolePermissions**: removing `payments.create` from Cashier takes effect immediately; `customised_at` is set.
+- **Reset to defaults**: restores permissions and clears `customised_at`.
+- **Custom role CRUD**: create, rename, delete; delete blocked when users hold the role.
+- **Privilege escalation**: actor cannot change permissions of a role they hold; non-admin cannot grant permissions they don't hold; non-admin cannot edit roles that hold `users.*` permissions.
+- **Audit log**: `SaveRolePermissions`, `CreateRole`, `DeleteRole` each write an `admin_audit_logs` row with correct `action` and `changes`.
+- **Access control**: Viewer gets 403 on the route; Cashier cannot call `CreateRole`.
+- **Livewire screen**: all 13 module groups visible; all four system roles visible.
+- **Modal dispatches**: `openCreate` → `modal-show create-role`; `openRename` → `modal-show rename-role`; `confirmDelete` → `modal-show delete-role`; `confirmOrSave` on role with users and removed permissions → `modal-show save-confirm`.
+- **storeRole**: creates role and dispatches `modal-close create-role`.

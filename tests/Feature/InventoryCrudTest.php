@@ -41,7 +41,7 @@ test('role seeder syncs the intended permissions idempotently', function () {
     $storekeeper = Role::findByName('Storekeeper', 'web');
     $viewer = Role::findByName('Viewer', 'web');
 
-    expect($admin->permissions)->toHaveCount(59)
+    expect($admin->permissions)->toHaveCount(63)
         ->and($storekeeper->permissions)->toHaveCount(21)
         ->and($viewer->permissions)->toHaveCount(10)
         ->and($storekeeper->hasPermissionTo('products.delete'))->toBeFalse()

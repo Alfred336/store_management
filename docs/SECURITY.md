@@ -35,6 +35,16 @@ Authorization uses **Spatie Permission** (role/permission guards):
 
 Each Livewire action calls `$this->authorize(...)` or `Gate::authorize(...)` as the **first line** of every public method. All record IDs exposed in components are marked `#[Locked]` to prevent client-side tampering.
 
+### Roles & Permissions Screen — Privilege Escalation Rules
+
+Three additional rules enforced by `SaveRolePermissions`:
+
+1. **Own-role lock**: a user cannot modify a role they hold (prevents self-escalation).
+2. **Grant ceiling**: a non-admin cannot grant a permission they themselves don't hold.
+3. **Sensitive-role guard**: only Admin can edit roles that hold any `users.*` or `roles.*` permission.
+
+The `roles.view/create/update/delete` permissions are granted to Admin only by default. The `roles.view` permission gates the `/admin/roles` route; all actions re-check in `mount()` and every public method.
+
 ## Financial Data Integrity
 
 - **Decimal arithmetic only**: all monetary values use PostgreSQL `NUMERIC` columns and PHP BCMath. Floating-point arithmetic is never used for money.
