@@ -273,6 +273,9 @@ class Index extends Component
                     $this->addError($field, $message);
                 }
             }
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('adjustQuantity', 'An unexpected error occurred. Please try again.');
         }
     }
 
@@ -333,6 +336,9 @@ class Index extends Component
                     $this->addError($field, $message);
                 }
             }
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('transferQuantity', 'An unexpected error occurred. Please try again.');
         }
     }
 

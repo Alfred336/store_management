@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sales\Pos;
 
+use App\Exceptions\InsufficientStockException;
 use App\Livewire\Actions\Sales\ClosePosSession;
 use App\Livewire\Actions\Sales\CompletePosSale;
 use App\Livewire\Actions\Sales\HoldSale;
@@ -16,6 +17,8 @@ use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Settings\Settings;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -166,6 +169,24 @@ class Index extends Component
             ->whereNull('deleted_at')
             ->firstOrFail();
 
+        // Check stock availability at the session location before adding
+        if ($this->sessionId !== null) {
+            $session = $this->loadSession();
+            if ($session !== null) {
+                $available = $this->availableAtLocation($product->id, $session->location_id);
+                if (bccomp($available, '0', 3) <= 0) {
+                    $locationName = $session->location->name ?? 'this location';
+                    Flux::toast(
+                        variant: 'warning',
+                        text: "Out of stock at {$locationName}.",
+                    );
+                    $this->productSearch = '';
+
+                    return;
+                }
+            }
+        }
+
         // Check if product already in cart — bump quantity
         foreach ($this->cart as $index => $item) {
             if ($item['product_id'] === $product->id && $item['unit_id'] === (int) $product->base_unit_id) {
@@ -239,6 +260,64 @@ class Index extends Component
         } catch (\Throwable) {
             return ['subtotal' => '0.00', 'discount_total' => '0.00', 'tax_total' => '0.00', 'total' => '0.00'];
         }
+    }
+
+    /**
+     * Available (non-expired) stock quantity per product_id at the session's location.
+     *
+     * @return array<int, string>
+     */
+    /** @return array<int, numeric-string> */
+    #[Computed]
+    public function stockAtLocation(): array
+    {
+        if ($this->sessionId === null || empty($this->cart)) {
+            return [];
+        }
+
+        $session = $this->loadSession();
+        if ($session === null) {
+            return [];
+        }
+
+        $productIds = array_column($this->cart, 'product_id');
+
+        $rows = DB::table('stock_levels')
+            ->selectRaw('stock_levels.product_id, SUM(stock_levels.quantity) as total_qty')
+            ->leftJoin('batches', 'stock_levels.batch_id', '=', 'batches.id')
+            ->whereIn('stock_levels.product_id', $productIds)
+            ->where('stock_levels.location_id', $session->location_id)
+            ->where(function (QueryBuilder $q): void {
+                $q->whereNull('stock_levels.batch_id')
+                    ->orWhereNull('batches.expiry_date')
+                    ->orWhere('batches.expiry_date', '>=', now()->toDateString());
+            })
+            ->groupBy('stock_levels.product_id')
+            ->get();
+
+        /** @var array<int, numeric-string> $map */
+        $map = [];
+        foreach ($rows as $row) {
+            $rawQty = (string) $row->total_qty;
+            $map[(int) $row->product_id] = is_numeric($rawQty) ? $rawQty : '0.000';
+        }
+
+        return $map;
+    }
+
+    /** True when any cart line requests more than the available stock at the session location. */
+    #[Computed]
+    public function hasStockIssues(): bool
+    {
+        $stock = $this->stockAtLocation();
+        foreach ($this->cart as $item) {
+            $available = bcadd($stock[$item['product_id']] ?? '0.000', '0', 3);
+            if (bccomp($item['quantity'], $available, 3) > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // ─── Payment panel ────────────────────────────────────────────────────
@@ -338,13 +417,25 @@ class Index extends Component
                 : '0.00';
 
             $this->activePanel = 'receipt';
+        } catch (InsufficientStockException $e) {
+            $productName = $e->productId !== null
+                ? (Product::query()->where('id', $e->productId)->value('name') ?? "product #{$e->productId}")
+                : 'a product';
+            $locationName = $e->locationId !== null
+                ? (Location::query()->where('id', $e->locationId)->value('name') ?? "location #{$e->locationId}")
+                : 'this location';
+            $this->addError('stock', "Not enough stock for {$productName} at {$locationName}. Available: {$e->availableQuantity}.");
         } catch (ValidationException $e) {
             foreach ($e->errors() as $field => $messages) {
                 foreach ($messages as $message) {
                     $this->addError($field, $message);
                 }
             }
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('stock', 'An unexpected error occurred while processing the sale. Please try again.');
         }
+        // Cart, tenders, and idempotency key are intentionally left intact for retry.
     }
 
     // ─── Held sales ───────────────────────────────────────────────────────
@@ -449,6 +540,27 @@ class Index extends Component
                 ->get()
             : collect();
 
+        // Per-product available stock at the session location for search results
+        $productStockMap = [];
+        if ($session !== null && $productResults->isNotEmpty()) {
+            $pids = $productResults->pluck('id')->toArray();
+            $rows = DB::table('stock_levels')
+                ->selectRaw('stock_levels.product_id, SUM(stock_levels.quantity) as total_qty')
+                ->leftJoin('batches', 'stock_levels.batch_id', '=', 'batches.id')
+                ->whereIn('stock_levels.product_id', $pids)
+                ->where('stock_levels.location_id', $session->location_id)
+                ->where(function (QueryBuilder $q): void {
+                    $q->whereNull('stock_levels.batch_id')
+                        ->orWhereNull('batches.expiry_date')
+                        ->orWhere('batches.expiry_date', '>=', now()->toDateString());
+                })
+                ->groupBy('stock_levels.product_id')
+                ->get();
+            foreach ($rows as $row) {
+                $productStockMap[(int) $row->product_id] = (string) $row->total_qty;
+            }
+        }
+
         $heldSales = $this->sessionId !== null
             ? PosHeldSale::query()
                 ->where('pos_session_id', $this->sessionId)
@@ -478,7 +590,8 @@ class Index extends Component
         $currency = app(Settings::class)->get('business.currency', 'TZS');
 
         return view('livewire.sales.pos.index', compact(
-            'session', 'productResults', 'heldSales', 'customerResults', 'selectedCustomer', 'locations', 'currency'
+            'session', 'productResults', 'productStockMap', 'heldSales',
+            'customerResults', 'selectedCustomer', 'locations', 'currency'
         ))->layout('layouts.pos');
     }
 
@@ -496,5 +609,29 @@ class Index extends Component
     private function walkInCustomerId(): ?int
     {
         return Customer::query()->where('is_walk_in', true)->value('id');
+    }
+
+    /**
+     * Available non-expired stock for a single product at a given location.
+     *
+     * @return numeric-string
+     */
+    private function availableAtLocation(int $productId, int $locationId): string
+    {
+        $qty = DB::table('stock_levels')
+            ->selectRaw('SUM(stock_levels.quantity) as total_qty')
+            ->leftJoin('batches', 'stock_levels.batch_id', '=', 'batches.id')
+            ->where('stock_levels.product_id', $productId)
+            ->where('stock_levels.location_id', $locationId)
+            ->where(function (QueryBuilder $q): void {
+                $q->whereNull('stock_levels.batch_id')
+                    ->orWhereNull('batches.expiry_date')
+                    ->orWhere('batches.expiry_date', '>=', now()->toDateString());
+            })
+            ->value('total_qty');
+
+        $rawQty = $qty !== null ? (string) $qty : null;
+
+        return $rawQty !== null && is_numeric($rawQty) ? $rawQty : '0.000';
     }
 }

@@ -122,7 +122,7 @@ class IssueStock
 
         if (bccomp($remaining, '0', 3) > 0) {
             // Only non-expired stock counts as available.
-            throw new InsufficientStockException($available);
+            throw new InsufficientStockException($available, $product->id, $locationId);
         }
 
         return $plan;

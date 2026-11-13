@@ -422,6 +422,9 @@ class Index extends Component
             $this->issueError = $e->getMessage();
         } catch (ValidationException $e) {
             $this->issueError = collect($e->errors())->flatten()->implode(' ');
+        } catch (\Throwable $e) {
+            report($e);
+            $this->issueError = 'An unexpected error occurred while issuing the invoice. Please try again.';
         }
     }
 

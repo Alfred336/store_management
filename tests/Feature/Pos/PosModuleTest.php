@@ -20,6 +20,7 @@ use App\Models\PosHeldSale;
 use App\Models\PosSession;
 use App\Models\Product;
 use App\Models\StockLevel;
+use App\Models\StockMovement;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\Settings\Settings;
@@ -796,4 +797,164 @@ test('thermal_receipt_with_many_allocations_renders_a_pdf', function (): void {
         ->assertHeader('Content-Type', 'application/pdf');
 
     expect(substr($response->getContent(), 0, 4))->toBe('%PDF');
+});
+
+// ─── Screen: insufficient stock — no 500, error shown, nothing saved ──────────
+
+test('pos_screen_insufficient_stock_shows_error_no_invoice_saved', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    posSession($user, $location);
+    $product = posProduct($location, '100.00', withStock: false); // zero stock
+    walkInCustomer();
+
+    $invoicesBefore = Invoice::count();
+    $movementsBefore = StockMovement::count();
+    $paymentsBefore = Payment::count();
+
+    $component = Livewire::actingAs($user)->test(PosIndex::class)
+        ->set('cart', [[
+            'product_id' => $product->id,
+            'name' => $product->name,
+            'sku' => $product->sku ?? '',
+            'unit_id' => $product->base_unit_id,
+            'quantity' => '1.000',
+            'unit_price' => '100.00',
+            'discount_amount' => '0.00',
+            'tax_type' => 'exempt',
+        ]])
+        ->set('activePanel', 'payment')
+        ->set('tenders', [['method' => 'cash', 'amount' => '100.00', 'reference' => '']])
+        ->set('posIdempotencyKey', Str::uuid()->toString())
+        ->call('completeSale');
+
+    // No 500, stays on payment panel
+    $component->assertHasErrors('stock')
+        ->assertSet('activePanel', 'payment');
+
+    // Error message names the product
+    expect($component->errors()->first('stock'))->toContain($product->name);
+
+    // Cart and tenders intact
+    expect($component->get('cart'))->not->toBeEmpty();
+    expect($component->get('tenders'))->not->toBeEmpty();
+
+    // Nothing persisted
+    expect(Invoice::count())->toBe($invoicesBefore);
+    expect(StockMovement::count())->toBe($movementsBefore);
+    expect(Payment::count())->toBe($paymentsBefore);
+});
+
+// ─── Screen: idempotency key kept on stock failure ────────────────────────────
+
+test('pos_screen_idempotency_key_unchanged_after_stock_failure', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    posSession($user, $location);
+    $product = posProduct($location, '100.00', withStock: false);
+    walkInCustomer();
+
+    $key = Str::uuid()->toString();
+
+    $component = Livewire::actingAs($user)->test(PosIndex::class)
+        ->set('cart', [[
+            'product_id' => $product->id,
+            'name' => $product->name,
+            'sku' => '',
+            'unit_id' => $product->base_unit_id,
+            'quantity' => '1.000',
+            'unit_price' => '100.00',
+            'discount_amount' => '0.00',
+            'tax_type' => 'exempt',
+        ]])
+        ->set('activePanel', 'payment')
+        ->set('tenders', [['method' => 'cash', 'amount' => '100.00', 'reference' => '']])
+        ->set('posIdempotencyKey', $key)
+        ->call('completeSale');
+
+    $component->assertHasErrors('stock');
+    expect($component->get('posIdempotencyKey'))->toBe($key);
+});
+
+// ─── Screen: zero-stock product cannot be added to cart ───────────────────────
+
+test('pos_screen_zero_stock_product_not_added_to_cart', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    posSession($user, $location);
+    $product = posProduct($location, '100.00', withStock: false); // zero stock
+
+    Livewire::actingAs($user)->test(PosIndex::class)
+        ->call('addToCart', $product->id)
+        ->assertSet('cart', []);
+});
+
+// ─── Screen: product with stock is added normally ─────────────────────────────
+
+test('pos_screen_product_with_stock_is_added_to_cart', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    posSession($user, $location);
+    $product = posProduct($location, '100.00', withStock: true); // has stock
+
+    $component = Livewire::actingAs($user)->test(PosIndex::class)
+        ->call('addToCart', $product->id);
+
+    $cart = $component->get('cart');
+    expect($cart)->toHaveCount(1)
+        ->and($cart[0]['product_id'])->toBe($product->id);
+});
+
+// ─── Screen: partial stock error — no invoice saved, available qty in message ──
+
+test('pos_screen_partial_stock_error_no_invoice_saved', function (): void {
+    $user = posUser();
+    $location = posLocation();
+    $this->actingAs($user);
+
+    posSession($user, $location);
+    $product = posProduct($location, '100.00', withStock: false);
+    walkInCustomer();
+
+    // Give it only 2 units
+    StockLevel::forceCreate([
+        'product_id' => $product->id,
+        'location_id' => $location->id,
+        'batch_id' => null,
+        'quantity' => '2.000',
+    ]);
+
+    $invoicesBefore = Invoice::count();
+
+    // Request 5 → not enough stock
+    $component = Livewire::actingAs($user)->test(PosIndex::class)
+        ->set('cart', [[
+            'product_id' => $product->id,
+            'name' => $product->name,
+            'sku' => '',
+            'unit_id' => $product->base_unit_id,
+            'quantity' => '5.000',
+            'unit_price' => '100.00',
+            'discount_amount' => '0.00',
+            'tax_type' => 'exempt',
+        ]])
+        ->set('activePanel', 'payment')
+        ->set('tenders', [['method' => 'cash', 'amount' => '500.00', 'reference' => '']])
+        ->set('posIdempotencyKey', Str::uuid()->toString())
+        ->call('completeSale');
+
+    $component->assertHasErrors('stock')
+        ->assertSet('activePanel', 'payment');
+
+    expect(Invoice::count())->toBe($invoicesBefore);
+    // Available qty mentioned in message
+    expect($component->errors()->first('stock'))->toContain('2');
 });

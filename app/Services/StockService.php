@@ -204,7 +204,7 @@ class StockService
         $newQuantity = bcadd((string) $level->quantity, $signedBaseQuantity, self::SCALE);
 
         if (bccomp($newQuantity, '0', self::SCALE) < 0) {
-            throw new InsufficientStockException((string) $level->quantity);
+            throw new InsufficientStockException((string) $level->quantity, $product->id, $locationId);
         }
 
         $level->quantity = $newQuantity;

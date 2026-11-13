@@ -4,9 +4,11 @@
         <div class="flex items-center gap-3">
             <flux:heading size="lg">POS</flux:heading>
             @if ($session)
-                <span class="rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300">
-                    Session #{{ $session->id }} · {{ $session->location->name }}
-                </span>
+                <div class="flex items-center gap-2">
+                    <span class="rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300">Open</span>
+                    <span class="text-sm font-semibold text-zinc-800 dark:text-zinc-100">{{ $session->location->name }}</span>
+                    <span class="text-xs text-zinc-400">#{{ $session->id }}</span>
+                </div>
             @else
                 <span class="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">No session</span>
             @endif
@@ -39,15 +41,30 @@
                 @if ($productResults->isNotEmpty())
                     <div class="grid gap-2 sm:grid-cols-2">
                         @foreach ($productResults as $product)
-                            <button
-                                type="button"
-                                wire:click="addToCart({{ $product->id }})"
-                                class="rounded-xl border border-zinc-200 bg-white p-3 text-left hover:border-blue-400 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-blue-500"
-                            >
-                                <p class="font-medium text-sm">{{ $product->name }}</p>
-                                <p class="text-xs text-zinc-500">{{ $product->sku }}</p>
-                                <p class="mt-1 text-sm font-semibold">{{ $product->selling_price }} {{ $currency }}</p>
-                            </button>
+                            @php
+                                $available = $productStockMap[$product->id] ?? null;
+                                $outOfStock = $session !== null && ($available === null || bccomp($available, '0', 3) <= 0);
+                            @endphp
+                            @if ($outOfStock)
+                                <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-3 opacity-60 dark:border-zinc-700 dark:bg-zinc-900">
+                                    <p class="font-medium text-sm">{{ $product->name }}</p>
+                                    <p class="text-xs text-zinc-500">{{ $product->sku }}</p>
+                                    <p class="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">Out of stock at {{ $session->location->name }}</p>
+                                </div>
+                            @else
+                                <button
+                                    type="button"
+                                    wire:click="addToCart({{ $product->id }})"
+                                    class="rounded-xl border border-zinc-200 bg-white p-3 text-left hover:border-blue-400 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-blue-500"
+                                >
+                                    <p class="font-medium text-sm">{{ $product->name }}</p>
+                                    <p class="text-xs text-zinc-500">{{ $product->sku }}</p>
+                                    <p class="mt-1 text-sm font-semibold">{{ $product->selling_price }} {{ $currency }}</p>
+                                    @if ($session !== null && $available !== null)
+                                        <p class="text-xs text-zinc-400">Avail: {{ $available }}</p>
+                                    @endif
+                                </button>
+                            @endif
                         @endforeach
                     </div>
                 @elseif ($productSearch !== '')
@@ -81,12 +98,27 @@
                 </div>
 
                 {{-- Cart items --}}
+                @php $cartStock = $this->stockAtLocation(); @endphp
                 <div class="flex-1 overflow-y-auto p-3 space-y-2">
                     @forelse ($cart as $index => $item)
-                        <div class="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-800" wire:key="cart-{{ $index }}">
+                        @php
+                            $itemAvailable = $cartStock[$item['product_id']] ?? '0.000';
+                            $overStock = bccomp($item['quantity'], $itemAvailable, 3) > 0;
+                        @endphp
+                        <div
+                            wire:key="cart-{{ $index }}"
+                            @class([
+                                'flex items-center gap-2 rounded-lg border p-2',
+                                'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800' => !$overStock,
+                                'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950' => $overStock,
+                            ])
+                        >
                             <div class="flex-1 min-w-0">
                                 <p class="truncate text-sm font-medium">{{ $item['name'] }}</p>
                                 <p class="text-xs text-zinc-500">{{ $item['sku'] }}</p>
+                                @if ($overStock)
+                                    <p class="text-xs font-medium text-red-600 dark:text-red-400">Avail: {{ $itemAvailable }}</p>
+                                @endif
                             </div>
                             <flux:input
                                 wire:change="updateCartItem({{ $index }}, 'quantity', $event.target.value)"
@@ -134,10 +166,14 @@
                     @endif
                     <div class="flex justify-between text-sm text-zinc-500"><span>Tax</span><span>{{ $totals['tax_total'] }} {{ $currency }}</span></div>
                     <div class="flex justify-between text-base font-bold"><span>Total</span><span>{{ $totals['total'] }} {{ $currency }}</span></div>
+                    @php $hasStockIssues = $this->hasStockIssues(); @endphp
                     <div class="pt-2">
-                        <flux:button variant="primary" class="w-full" wire:click="openPaymentPanel" :disabled="empty($cart) || !$session">
+                        <flux:button variant="primary" class="w-full" wire:click="openPaymentPanel" :disabled="empty($cart) || !$session || $hasStockIssues">
                             Charge {{ $totals['total'] }} {{ $currency }}
                         </flux:button>
+                        @if ($hasStockIssues)
+                            <p class="mt-1 text-center text-xs text-red-600 dark:text-red-400">Insufficient stock — adjust quantities or remove over-stock items before paying.</p>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -149,6 +185,9 @@
                 <div class="flex items-center gap-3">
                     <flux:button variant="ghost" icon="arrow-left" wire:click="$set('activePanel', 'sale')" />
                     <flux:heading size="lg">Payment</flux:heading>
+                    @if ($session)
+                        <span class="text-sm text-zinc-500">{{ $session->location->name }}</span>
+                    @endif
                 </div>
 
                 @php $totals = $this->totals(); @endphp
@@ -185,6 +224,7 @@
                     </div>
                 @endif
 
+                @error('stock') <p class="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:bg-red-950 dark:text-red-300">{{ $message }}</p> @enderror
                 @error('tenders') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
                 @error('customer_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
                 @error('items') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
@@ -225,7 +265,7 @@
                     <flux:heading size="lg">Close Session</flux:heading>
                     <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800 space-y-1 text-sm">
                         <div class="flex justify-between"><span class="text-zinc-500">Session</span><span>#{{ $session->id }}</span></div>
-                        <div class="flex justify-between"><span class="text-zinc-500">Location</span><span>{{ $session->location->name }}</span></div>
+                        <div class="flex justify-between"><span class="text-zinc-500">Location</span><span class="font-semibold">{{ $session->location->name }}</span></div>
                         <div class="flex justify-between"><span class="text-zinc-500">Opened</span><span>{{ $session->opened_at->format('d M H:i') }}</span></div>
                         <div class="flex justify-between"><span class="text-zinc-500">Opening cash</span><span>{{ $session->opening_cash }} {{ $currency }}</span></div>
                     </div>
