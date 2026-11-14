@@ -1,8 +1,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+@php $appName = $companyName ?? config('app.name'); @endphp
+
 <title>
-    {{ filled($title ?? null) ? $title.' - '.config('app.name', 'Laravel') : config('app.name', 'Laravel') }}
+    {{ filled($title ?? null) ? $title.' - '.$appName : $appName }}
 </title>
 
 <link rel="icon" href="/favicon.ico" sizes="any">

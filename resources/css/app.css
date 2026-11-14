@@ -23,16 +23,22 @@
     --color-zinc-900: #171717;
     --color-zinc-950: #0a0a0a;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    /* Brand accent: emerald-600 light / emerald-500 dark */
+    --color-accent: #059669;        /* emerald-600 */
+    --color-accent-content: #059669;
+    --color-accent-foreground: #ffffff;
+
+    /* Design tokens */
+    --radius-card: 0.75rem;         /* 12 px */
+    --radius-badge: 9999px;
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / .08), 0 1px 2px -1px rgb(0 0 0 / .06);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: #10b981;        /* emerald-500 */
+        --color-accent-content: #10b981;
+        --color-accent-foreground: #ffffff;
     }
 }
 

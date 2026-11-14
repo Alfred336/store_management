@@ -27,12 +27,14 @@ use App\Policies\UnitPolicy;
 use App\Policies\UserPolicy;
 use App\Services\Fiscal\FiscalProvider;
 use App\Services\Fiscal\NullFiscalProvider;
+use App\Services\Settings\Settings;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Livewire;
@@ -53,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->shareCompanyName();
 
         // Apply auth-enforcement middleware to Livewire wire-update calls so that
         // deactivations and forced password changes take effect even mid-session.
@@ -75,6 +78,31 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Quotation::class, QuotationPolicy::class);
         Gate::policy(Setting::class, SettingPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
+    }
+
+    /** Share company name (from business settings) with all views. */
+    protected function shareCompanyName(): void
+    {
+        View::composer('*', function (\Illuminate\View\View $view): void {
+            static $resolved = false;
+            static $name = null;
+
+            if (! $resolved) {
+                try {
+                    /** @var Settings $settings */
+                    $settings = app(Settings::class);
+                    $raw = $settings->get('business.name', null);
+                    $name = is_string($raw) && $raw !== '' ? $raw : config('app.name', 'StoreManager');
+                } catch (\Throwable) {
+                    $name = config('app.name', 'StoreManager');
+                }
+                $resolved = true;
+            }
+
+            if (! array_key_exists('companyName', $view->getData())) {
+                $view->with('companyName', $name);
+            }
+        });
     }
 
     /**
