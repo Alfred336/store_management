@@ -477,8 +477,8 @@ class DashboardService
             $rows = $q->get();
 
             return [
-                'labels' => $rows->pluck('cat')->values()->all(),
-                'datasets' => [['label' => 'Revenue', 'data' => $rows->pluck('total')->map(fn ($v) => (float) $v)->values()->all()]],
+                'labels' => array_values($rows->pluck('cat')->map(fn ($v) => (string) $v)->all()),
+                'datasets' => [['label' => 'Revenue', 'data' => array_values($rows->pluck('total')->map(fn ($v) => (float) $v)->all())]],
             ];
         });
     }
@@ -512,8 +512,8 @@ class DashboardService
             $rows = $q->get();
 
             return [
-                'labels' => $rows->pluck('method')->map(fn ($m) => ucfirst((string) $m))->values()->all(),
-                'datasets' => [['label' => 'Payments', 'data' => $rows->pluck('total')->map(fn ($v) => (float) $v)->values()->all()]],
+                'labels' => array_values($rows->pluck('method')->map(fn ($m) => ucfirst((string) $m))->all()),
+                'datasets' => [['label' => 'Payments', 'data' => array_values($rows->pluck('total')->map(fn ($v) => (float) $v)->all())]],
             ];
         });
     }

@@ -23,6 +23,8 @@ $map = [
     'low_stock'      => ['label' => 'Low Stock',      'class' => 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'],
     'out_of_stock'   => ['label' => 'Out of Stock',   'class' => 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400'],
     'in_stock'       => ['label' => 'In Stock',       'class' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'],
+    // Generic
+    'inactive'       => ['label' => 'Inactive',       'class' => 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'],
 ];
 
 $key    = is_string($status) ? strtolower($status) : (is_object($status) && method_exists($status, 'value') ? $status->value : (string) $status);
