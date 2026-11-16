@@ -370,15 +370,16 @@ test('PDF render route is rejected for user without invoices.print', function ()
     $response->assertForbidden();
 });
 
-// ─── Invalid template / paper ─────────────────────────────────────────────────
+// ─── Template / paper params ignored — read from settings ─────────────────────
 
-test('PDF route rejects an unknown template value with 422', function () {
+test('PDF route ignores unknown template param and uses settings template', function () {
     bootstrapDocPermissions();
     $user = docUser(['invoices.create', 'invoices.issue', 'invoices.print']);
     $this->actingAs($user);
 
     $invoice = makeIssuedInvoice('IDEMP-INV-TMPL-01');
 
+    // Template and paper are read from settings; unknown request params are ignored.
     $response = $this->get(route('invoices.pdf', [
         'invoice' => $invoice->id,
         'template' => 'nonexistent_template',
@@ -386,17 +387,17 @@ test('PDF route rejects an unknown template value with 422', function () {
         'mode' => 'inline',
     ]));
 
-    $response->assertStatus(422);
+    $response->assertOk();
 });
 
-test('PDF route rejects a paper size not supported by the selected template', function () {
+test('PDF route ignores incompatible paper param and uses settings paper', function () {
     bootstrapDocPermissions();
     $user = docUser(['invoices.create', 'invoices.issue', 'invoices.print']);
     $this->actingAs($user);
 
     $invoice = makeIssuedInvoice('IDEMP-INV-PAPER-01');
 
-    // classic only supports A4 — 80mm is thermal-only
+    // Paper is read from settings; a thermal-only paper param is ignored.
     $response = $this->get(route('invoices.pdf', [
         'invoice' => $invoice->id,
         'template' => 'classic',
@@ -404,7 +405,7 @@ test('PDF route rejects a paper size not supported by the selected template', fu
         'mode' => 'inline',
     ]));
 
-    $response->assertStatus(422);
+    $response->assertOk();
 });
 
 // ─── Logo from local path ─────────────────────────────────────────────────────

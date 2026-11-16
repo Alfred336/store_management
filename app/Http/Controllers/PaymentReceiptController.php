@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Payment;
 use App\Services\Settings\Settings;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class PaymentReceiptController extends Controller
@@ -13,19 +12,20 @@ class PaymentReceiptController extends Controller
     /**
      * Render and stream a payment receipt PDF.
      *
+     * Payment receipts are always printed on thermal paper at the configured
+     * receipt width (pos.receipt_width from Business Settings).
+     *
      * Query parameters:
-     *   paper  – 'a4' | 'thermal' (defaults to 'a4')
-     *   mode   – 'inline' | 'download' (defaults to 'inline')
+     *   mode – 'inline' | 'download' (defaults to 'inline')
      */
-    public function __invoke(Payment $payment, Request $request, Settings $settings): Response
+    public function __invoke(Payment $payment, Settings $settings): Response
     {
         $this->authorize('view', $payment);
 
-        $paper = in_array($request->input('paper'), ['a4', 'thermal'], true)
-            ? $request->input('paper')
-            : 'a4';
+        $mode = request()->input('mode') === 'download' ? 'download' : 'inline';
 
-        $mode = $request->input('mode') === 'download' ? 'download' : 'inline';
+        $receiptWidth = (string) $settings->get('pos.receipt_width', '80mm');
+        $widthPt = $receiptWidth === '58mm' ? 164.41 : 226.77;
 
         $company = [
             'name' => (string) $settings->get('business.name', ''),
@@ -63,17 +63,10 @@ class PaymentReceiptController extends Controller
             'allocations' => $allocations,
         ];
 
-        $template = $paper === 'thermal' ? 'payments.receipt-thermal' : 'payments.receipt';
+        $pdf = Pdf::loadView('payments.receipt-thermal', $data);
 
-        $pdf = Pdf::loadView($template, $data);
-
-        if ($paper === 'thermal') {
-            // 80 mm × 2.8346 pt/mm = 226.77 pt; height scales with allocation count like invoice thermal template
-            $heightPt = max(300.0, 120.0 + (count($allocations) * 22.0) + 100.0);
-            $pdf->setPaper([0, 0, 226.77, $heightPt], 'portrait');
-        } else {
-            $pdf->setPaper('a4', 'portrait');
-        }
+        $heightPt = max(300.0, 120.0 + (count($allocations) * 22.0) + 100.0);
+        $pdf->setPaper([0, 0, $widthPt, $heightPt], 'portrait');
 
         $filename = $payment->number.'-receipt.pdf';
         $disposition = $mode === 'download' ? 'attachment' : 'inline';

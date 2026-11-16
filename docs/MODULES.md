@@ -64,7 +64,9 @@
   - `save` action stores the file on the private `local` disk at `invoices/{year}/{slug}.pdf` and records `size_bytes` and `sha256`.
 - **Fiscal extension**: `FiscalProvider` interface bound to `NullFiscalProvider` in `AppServiceProvider`. Templates show a fiscal block only when `FiscalProvider::getData()` returns non-null.
 - **Routes**: `GET /invoices/{invoice}/pdf` (`invoices.pdf`) and `GET /invoices/{invoice}/documents/{document}` (`invoices.document.download`) under the authenticated group.
-- **Print panel UI**: Template picker, paper picker (filtered by template's supported papers), preview iframe, Print/Download/Save buttons, and a saved-documents table with original/duplicate badges.
+- **Template selection**: Template and paper are configured in Business Settings (`invoicing.invoice_template`, `invoicing.invoice_paper`). `InvoicePdfController` reads from settings; request `template`/`paper` params are ignored. POS invoices (`channel=pos`) always render with the `thermal` template at the configured receipt width regardless of settings.
+- **Print panel UI**: Preview iframe, Print/Download/Save buttons, and a saved-documents table with original/duplicate badges. Template/paper pickers have been removed — configure in Business Settings.
+- **`InvoiceTemplate::nonThermalValues()`**: Returns `['classic', 'modern', 'minimal', 'compact']` — thermal is excluded from invoice/quotation settings validation.
 
 ## 7. Payments (Phase 4)
 
@@ -74,7 +76,7 @@
   - `AllocateCredit`: Applies unallocated credit from an active payment to open invoices.
   - `ReversePayment`: Reverses an active payment (reason required), restoring invoice balances and statuses.
 - **Screen** (`app/Livewire/Payments/Index.php`): Payment list with ILIKE search, method/status/date/customer filters, sortable columns, filtered totals bar, pagination. "Receive payment" form with customer picker, open invoices with balances, auto-allocate button. Details modal with allocation list, reversal info, and inline reverse confirmation.
-- **Receipt PDF**: `PaymentReceiptController` renders A4 or 80mm thermal receipt via DomPDF; route `GET /payments/{payment}/receipt` (`payments.receipt`).
+- **Receipt PDF**: `PaymentReceiptController` always renders a thermal receipt (never A4) via DomPDF; width follows `pos.receipt_width` setting (80mm default, 58mm option); route `GET /payments/{payment}/receipt` (`payments.receipt`).
 - **Permissions**: `payments.view` (Admin, Cashier, Viewer), `payments.create` (Admin, Cashier), `payments.reverse` (Admin only).
 - **Invariants**:
   - Payments are immutable; use `ReversePayment` to undo.
@@ -181,7 +183,7 @@
 
 - **Location**: `app/Services/Settings/Settings.php`, `app/Services/Invoicing/DocumentNumberingService.php`
 - **Features**:
-  - Key-value JSON settings store for company profile, currency, VAT rate, tax inclusion, credit limit enforcement mode, invoice printing defaults (`invoicing.default_template`, `invoicing.default_paper`, `pos.receipt_width`), and document footer (`business.bank_details`, `business.footer_terms`).
+  - Key-value JSON settings store for company profile, currency, VAT rate, tax inclusion, credit limit enforcement mode, invoice/quotation template settings (`invoicing.invoice_template`, `invoicing.invoice_paper`, `invoicing.quotation_template`, `invoicing.quotation_paper`, `pos.receipt_width`), and document footer (`business.bank_details`, `business.footer_terms`).
   - Atomic sequence allocation per document type (`invoice`, `receipt`, `payment`, `customer`, `quotation`) and year.
   - Quotation settings: `quotations.validity_days`, `quotations.default_terms`, `numbering.quotation_prefix`.
 
@@ -201,7 +203,7 @@
 - **PDF**:
   - Four templates: `classic`, `modern`, `minimal`, `compact` (all include "This is not a tax invoice." notice; no thermal).
   - `QuotationDocumentData` builds the view-model: company (from Settings), header, recipient (snapshot for sent, live for drafts), line items, totals with amount-in-words, watermark (DRAFT/EXPIRED/null).
-  - `QuotationPdfController` (`GET /quotations/{quotation}/pdf`): authorizes `quotations.print`; rejects `thermal`; streams inline or as download.
+  - `QuotationPdfController` (`GET /quotations/{quotation}/pdf`): authorizes `quotations.print`; reads template and paper from `invoicing.quotation_template` / `invoicing.quotation_paper` settings; request params are ignored; streams inline or as download.
 - **Email**: `QuotationMail` — synchronous (no queue). PDF bytes passed as constructor argument and attached via `Attachment::fromData()`.
 - **Screen** (`/quotations`): List with search, status/date/customer/location filters, sortable columns. Create/edit flyout (registered customer picker OR prospect fields). Send, accept, reject, revise, convert, and email action panels. All modals use `modal-show` / `modal-close` Livewire dispatch events.
 - **Permissions**: `quotations.view` (all roles), `quotations.create` / `quotations.update` / `quotations.send` / `quotations.convert` / `quotations.print` (Admin + Cashier), `quotations.delete` / `quotations.approve_discount` (Admin only).

@@ -1,5 +1,33 @@
 # Changelog
 
+## [Phase 3A: Passwords, Template Settings & Always-Thermal Receipts] - 2026-11-15
+
+### Added
+
+- **Password options on user create**: Admin can generate a random 16-char password (always emailed) or type a manual password (email optional). `must_change_password` checkbox defaults to ticked. Audit log records `pwd_mode`, `must_change`, `emailed` — never the plaintext.
+- **Password reset in edit form**: "Reset this user's password" section (gated by `users.reset_password`) with same generate/manual/must-change/email options. Clears `password_reset_tokens` for the target. Cannot reset own, inactive, or anonymized users.
+- **`InvoiceTemplate::nonThermalValues()`**: Static helper returning `['classic', 'modern', 'minimal', 'compact']` for settings validation.
+- **Separate invoice and quotation template settings**: New settings keys `invoicing.invoice_template`, `invoicing.invoice_paper`, `invoicing.quotation_template`, `invoicing.quotation_paper` replace the shared `invoicing.default_template` / `invoicing.default_paper`.
+- **Migration** `2026_11_14_000001_migrate_invoice_settings_keys.php`: Renames old keys and seeds quotation keys from invoice values. Run after deploying app code.
+- **Tests**: `tests/Feature/Users/UserManagementTest.php` (+13 password scenarios), `tests/Feature/Invoicing/DocumentTemplateTest.php` (8 tests), `tests/Feature/Payments/ThermalReceiptTest.php` (6 tests).
+
+### Changed
+
+- **`CreateUser` / `ResetUserPassword` actions**: Accept `passwordMode`, `plainPassword`, `mustChange`, `emailPassword` params.
+- **`Users/Index.php`**: Six new form properties; `store()` / `update()` validate and pass password options; `resetPassword()` now opens the edit form instead of resetting inline.
+- **Business Settings UI**: Split "Invoice printing defaults" into three sections — Invoice template, Quotation template, POS receipts. Thermal is not selectable as an invoice or quotation template.
+- **`InvoicePdfController`**: Reads template/paper from settings; ignores request params. POS invoices (`channel=pos`) always force `InvoiceTemplate::Thermal`.
+- **`QuotationPdfController`**: Reads template/paper from `invoicing.quotation_template` / `invoicing.quotation_paper`; ignores request params.
+- **`PaymentReceiptController`**: Always renders thermal receipt; A4 branch removed. Width from `pos.receipt_width` setting.
+- **Print panel** (`invoicing/partials/print-panel.blade.php`): Template/paper pickers removed.
+- **Quotation email panel** (`quotations/partials/email-panel.blade.php`): Template picker removed.
+
+### Removed
+
+- `resources/views/payments/receipt.blade.php` (A4 payment receipt view).
+- `$printTemplate`, `$printPaper` from `Livewire/Invoicing/Index.php`.
+- `$emailTemplate`, `$printTemplate`, `$printPaper` from `Livewire/Quotations/Index.php`.
+
 ## [Phase 7E: Roles & Permissions Management] - 2026-11-13
 
 ### Added

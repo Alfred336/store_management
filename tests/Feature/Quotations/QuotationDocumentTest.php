@@ -239,7 +239,7 @@ test('QuotationPdfController returns PDF inline for a sent quotation', function 
     expect($response->getContent())->toStartWith('%PDF');
 });
 
-test('QuotationPdfController rejects the thermal template', function () {
+test('QuotationPdfController ignores thermal template request param and uses settings', function () {
     bootstrapQuotPermissions();
     $setup = quotDocSetup();
     $user = quotDocUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.print']);
@@ -247,8 +247,9 @@ test('QuotationPdfController rejects the thermal template', function () {
 
     $quotation = quotDocMakeSent($setup);
 
+    // ?template=thermal is ignored; controller reads from settings (default classic)
     $response = $this->get(route('quotations.pdf', ['quotation' => $quotation->id]).'?template=thermal');
-    $response->assertStatus(422);
+    $response->assertOk();
 });
 
 test('QuotationPdfController returns 403 without quotations.print permission', function () {

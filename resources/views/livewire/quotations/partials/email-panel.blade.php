@@ -6,17 +6,8 @@
         </div>
 
         <div>
-            <flux:input wire:model="emailTo" label="Recipient email" type="email" required placeholder="customer@example.com" />
+            <flux:input wire:model="emailTo" label="Recipient email" type="email" required placeholder="customer@example.com" autofocus />
             @error('emailTo') <flux:text class="text-red-600 dark:text-red-400" size="sm">{{ $message }}</flux:text> @enderror
-        </div>
-
-        <div>
-            <flux:label>Template</flux:label>
-            <flux:select wire:model="emailTemplate">
-                @foreach($templates as $tpl)
-                    <option value="{{ $tpl->value }}">{{ ucfirst($tpl->value) }}</option>
-                @endforeach
-            </flux:select>
         </div>
 
         <div>

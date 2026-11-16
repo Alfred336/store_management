@@ -289,7 +289,7 @@ test('reset password sets must_change_password, deletes sessions and emails the 
 
     $log = AdminAuditLog::where('action', 'user.password_reset')->where('subject_id', $target->id)->first();
     expect($log)->not->toBeNull();
-    expect($log->changes)->toBeNull(); // no password in changes
+    expect($log->changes)->not->toHaveKey('password'); // actual password never stored
 });
 
 test('mail failure during reset rolls back the password change', function (): void {
@@ -887,6 +887,203 @@ test('anonymize refused when target has an open POS session', function (): void 
     expect(fn () => app(AnonymizeUser::class)($target))
         ->toThrow(ValidationException::class, 'This user has an open POS session. Close it before deleting.');
     expect(DB::table('users')->where('id', $target->id)->value('anonymized_at'))->toBeNull();
+});
+
+// ─── Password options on CreateUser ──────────────────────────────────────────
+
+test('create with manual password and no email: no mail sent, password stored correctly', function (): void {
+    Mail::fake();
+
+    $admin = adminUser();
+    $this->actingAs($admin);
+
+    $result = app(CreateUser::class)('Bob', 'manual@example.com', ['Cashier'], 'manual', 'MySecret99!', true, false);
+
+    Mail::assertNothingSent();
+    expect(Hash::check('MySecret99!', $result['user']->fresh()->password))->toBeTrue();
+    expect($result['user']->must_change_password)->toBeTrue();
+});
+
+test('create with manual password and email flag sends one mail', function (): void {
+    Mail::fake();
+
+    $admin = adminUser();
+    $this->actingAs($admin);
+
+    $result = app(CreateUser::class)('Bob', 'mailed@example.com', ['Cashier'], 'manual', 'MySecret99!', true, true);
+
+    Mail::assertSent(TemporaryPasswordMail::class, fn ($m) => $m->hasTo($result['user']->email));
+});
+
+test('must_change false is stored when explicitly passed to CreateUser', function (): void {
+    Mail::fake();
+
+    $admin = adminUser();
+    $this->actingAs($admin);
+
+    $result = app(CreateUser::class)('Bob', 'nochange@example.com', ['Cashier'], 'manual', 'MySecret99!', false, false);
+
+    expect($result['user']->must_change_password)->toBeFalse();
+});
+
+test('manual password shorter than 8 chars is rejected with a validation error', function (): void {
+    $admin = adminUser();
+    $this->actingAs($admin);
+
+    Livewire::test(UsersIndex::class)
+        ->set('name', 'Short Pass')
+        ->set('email', 'short@example.com')
+        ->set('roles', ['Cashier'])
+        ->set('passwordMode', 'manual')
+        ->set('plainPassword', 'abc')
+        ->set('plainPasswordConfirmation', 'abc')
+        ->call('store')
+        ->assertHasErrors(['plainPassword']);
+
+    expect(User::where('email', 'short@example.com')->exists())->toBeFalse();
+});
+
+test('manual password with mismatched confirmation is rejected', function (): void {
+    $admin = adminUser();
+    $this->actingAs($admin);
+
+    Livewire::test(UsersIndex::class)
+        ->set('name', 'Mismatch User')
+        ->set('email', 'mismatch@example.com')
+        ->set('roles', ['Cashier'])
+        ->set('passwordMode', 'manual')
+        ->set('plainPassword', 'MySecret99!')
+        ->set('plainPasswordConfirmation', 'DifferentPass!')
+        ->call('store')
+        ->assertHasErrors(['plainPassword']);
+});
+
+// ─── Password reset via edit form ─────────────────────────────────────────────
+
+test('edit form with doResetPassword=true (generate) resets password and emails user', function (): void {
+    Mail::fake();
+
+    $admin = adminUser();
+    $target = nonAdminUser('Cashier');
+    $this->actingAs($admin);
+
+    Livewire::test(UsersIndex::class)
+        ->call('openEdit', $target->id)
+        ->set('doResetPassword', true)
+        ->set('passwordMode', 'generate')
+        ->set('mustChangePassword', true)
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect($target->fresh()->must_change_password)->toBeTrue();
+    Mail::assertSent(TemporaryPasswordMail::class, fn ($m) => $m->hasTo($target->email));
+});
+
+test('edit form with doResetPassword=true (manual, no email) sets given password without mailing', function (): void {
+    Mail::fake();
+
+    $admin = adminUser();
+    $target = nonAdminUser('Cashier');
+    $this->actingAs($admin);
+
+    Livewire::test(UsersIndex::class)
+        ->call('openEdit', $target->id)
+        ->set('doResetPassword', true)
+        ->set('passwordMode', 'manual')
+        ->set('plainPassword', 'NewPass99!')
+        ->set('plainPasswordConfirmation', 'NewPass99!')
+        ->set('mustChangePassword', false)
+        ->set('emailPassword', false)
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect(Hash::check('NewPass99!', $target->fresh()->password))->toBeTrue();
+    expect($target->fresh()->must_change_password)->toBeFalse();
+    Mail::assertNothingSent();
+});
+
+test('edit form with doResetPassword=false does not change the password', function (): void {
+    Mail::fake();
+
+    $admin = adminUser();
+    $target = nonAdminUser('Cashier');
+    $originalHash = $target->password;
+    $this->actingAs($admin);
+
+    Livewire::test(UsersIndex::class)
+        ->call('openEdit', $target->id)
+        ->set('doResetPassword', false)
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect($target->fresh()->password)->toBe($originalHash);
+    Mail::assertNothingSent();
+});
+
+test('mail failure during edit-form reset rolls back the password change', function (): void {
+    $admin = adminUser();
+    $target = nonAdminUser('Cashier');
+    $originalHash = $target->password;
+    $this->actingAs($admin);
+
+    Mail::shouldReceive('to')->andThrow(new RuntimeException('SMTP error'));
+
+    expect(fn () => app(ResetUserPassword::class)($target, 'generate', null, true, true))
+        ->toThrow(RuntimeException::class);
+
+    expect($target->fresh()->password)->toBe($originalHash);
+});
+
+test('reset password deletes password_reset_tokens for the target', function (): void {
+    Mail::fake();
+
+    $admin = adminUser();
+    $target = nonAdminUser('Cashier');
+
+    DB::table('password_reset_tokens')->insert([
+        'email' => $target->email,
+        'token' => 'fake-token',
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($admin);
+    app(ResetUserPassword::class)($target);
+
+    expect(DB::table('password_reset_tokens')->where('email', $target->email)->exists())->toBeFalse();
+});
+
+test('cashier cannot reset another user password', function (): void {
+    $cashier = nonAdminUser('Cashier');
+    $target = nonAdminUser('Cashier');
+    $this->actingAs($cashier);
+
+    expect(fn () => app(ResetUserPassword::class)($target))
+        ->toThrow(AuthorizationException::class);
+});
+
+test('inactive user password cannot be reset', function (): void {
+    $admin = adminUser();
+    $target = nonAdminUser('Cashier');
+    $target->forceFill(['is_active' => false])->save();
+    $this->actingAs($admin);
+
+    expect(fn () => app(ResetUserPassword::class)($target))
+        ->toThrow(ValidationException::class);
+});
+
+test('reset password audit log has pwd_mode key but no password key', function (): void {
+    Mail::fake();
+
+    $admin = adminUser();
+    $target = nonAdminUser('Cashier');
+    $this->actingAs($admin);
+
+    app(ResetUserPassword::class)($target);
+
+    $log = AdminAuditLog::where('action', 'user.password_reset')->where('subject_id', $target->id)->first();
+    expect($log)->not->toBeNull();
+    expect($log->changes)->toHaveKey('pwd_mode');
+    expect($log->changes)->not->toHaveKey('password');
 });
 
 test('non-admin without users.delete permission cannot anonymize', function (): void {

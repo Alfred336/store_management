@@ -134,14 +134,7 @@ class Index extends Component
 
     public string $emailMessage = '';
 
-    public string $emailTemplate = 'classic';
-
     public ?string $emailError = null;
-
-    // ─── Print ────────────────────────────────────────────────────────────
-    public string $printTemplate = 'classic';
-
-    public string $printPaper = 'A4';
 
     // ─────────────────────────────────────────────────────────────────────
 
@@ -151,8 +144,6 @@ class Index extends Component
         $this->quoteDate = now()->toDateString();
         $this->validUntil = now()->addDays((int) $settings->get('quotations.validity_days', 14))->toDateString();
         $this->terms = (string) $settings->get('quotations.default_terms', '');
-        $this->printTemplate = (string) $settings->get('invoicing.default_template', InvoiceTemplate::default()->value);
-        $this->printPaper = (string) $settings->get('invoicing.default_paper', InvoiceTemplate::default()->defaultPaper());
     }
 
     public function updatedSearch(): void
@@ -576,7 +567,7 @@ class Index extends Component
         $this->dispatch('modal-close', name: 'quotation-email');
     }
 
-    public function sendEmail(QuotationDocumentData $documentData): void
+    public function sendEmail(QuotationDocumentData $documentData, Settings $settings): void
     {
         $quotation = Quotation::query()
             ->with(['items.unit', 'location', 'customer'])
@@ -590,18 +581,21 @@ class Index extends Component
             return;
         }
 
-        $template = InvoiceTemplate::tryFrom($this->emailTemplate) ?? InvoiceTemplate::Classic;
-        if ($template->isThermal()) {
-            $this->emailError = 'Thermal template cannot be used for quotations.';
-
-            return;
-        }
-
         $this->emailError = null;
+
+        $templateKey = (string) $settings->get('invoicing.quotation_template', InvoiceTemplate::default()->value);
+        $template = InvoiceTemplate::tryFrom($templateKey) ?? InvoiceTemplate::default();
+        if ($template->isThermal()) {
+            $template = InvoiceTemplate::default();
+        }
+        $paper = (string) $settings->get('invoicing.quotation_paper', $template->defaultPaper());
+        if (! in_array($paper, $template->supportedPapers(), true)) {
+            $paper = $template->defaultPaper();
+        }
 
         $data = $documentData->build($quotation);
         $pdf = Pdf::loadView('quotations.templates.'.$template->value, $data);
-        $pdf->setPaper(strtolower($template->defaultPaper()), 'portrait');
+        $pdf->setPaper(strtolower($paper), 'portrait');
         $bytes = (string) $pdf->output();
 
         $filename = ($quotation->number ?? 'quotation-draft').'-'.$template->value.'.pdf';
@@ -760,8 +754,6 @@ class Index extends Component
                 ->find($this->quotationId);
         }
 
-        $templates = array_filter(InvoiceTemplate::cases(), fn ($t) => ! $t->isThermal());
-
         return view('livewire.quotations.index', compact(
             'quotations',
             'locations',
@@ -771,7 +763,6 @@ class Index extends Component
             'productResults',
             'convertCustomerResults',
             'selectedQuotation',
-            'templates',
         ));
     }
 

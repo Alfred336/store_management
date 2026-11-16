@@ -56,9 +56,13 @@ class Index extends Component
 
     public string $footerTerms = '';
 
-    public string $defaultTemplate = 'classic';
+    public string $invoiceTemplate = 'classic';
 
-    public string $defaultPaper = 'A4';
+    public string $invoicePaper = 'A4';
+
+    public string $quotationTemplate = 'classic';
+
+    public string $quotationPaper = 'A4';
 
     public string $receiptWidth = '80mm';
 
@@ -86,8 +90,10 @@ class Index extends Component
         $this->creditLimitMode = (string) $settings->get('customers.credit_limit_mode', 'warn');
         $this->bankDetails = (string) $settings->get('business.bank_details', '');
         $this->footerTerms = (string) $settings->get('business.footer_terms', '');
-        $this->defaultTemplate = (string) $settings->get('invoicing.default_template', InvoiceTemplate::default()->value);
-        $this->defaultPaper = (string) $settings->get('invoicing.default_paper', InvoiceTemplate::default()->defaultPaper());
+        $this->invoiceTemplate = (string) $settings->get('invoicing.invoice_template', InvoiceTemplate::default()->value);
+        $this->invoicePaper = (string) $settings->get('invoicing.invoice_paper', InvoiceTemplate::default()->defaultPaper());
+        $this->quotationTemplate = (string) $settings->get('invoicing.quotation_template', InvoiceTemplate::default()->value);
+        $this->quotationPaper = (string) $settings->get('invoicing.quotation_paper', InvoiceTemplate::default()->defaultPaper());
         $this->receiptWidth = (string) $settings->get('pos.receipt_width', '80mm');
     }
 
@@ -116,8 +122,10 @@ class Index extends Component
             'creditLimitMode' => ['required', Rule::in(['warn', 'block'])],
             'bankDetails' => ['nullable', 'string', 'max:1000'],
             'footerTerms' => ['nullable', 'string', 'max:1000'],
-            'defaultTemplate' => ['required', Rule::in(array_column(InvoiceTemplate::cases(), 'value'))],
-            'defaultPaper' => ['required', Rule::in(InvoiceTemplate::allPapers())],
+            'invoiceTemplate' => ['required', Rule::in(InvoiceTemplate::nonThermalValues())],
+            'invoicePaper' => ['required', Rule::in(['A4', 'A5'])],
+            'quotationTemplate' => ['required', Rule::in(InvoiceTemplate::nonThermalValues())],
+            'quotationPaper' => ['required', Rule::in(['A4', 'A5'])],
             'receiptWidth' => ['required', Rule::in(['80mm', '58mm'])],
         ]);
 
@@ -142,8 +150,10 @@ class Index extends Component
             'credit_limit_mode' => $data['creditLimitMode'],
             'bank_details' => $data['bankDetails'] ?: null,
             'footer_terms' => $data['footerTerms'] ?: null,
-            'default_template' => $data['defaultTemplate'],
-            'default_paper' => $data['defaultPaper'],
+            'invoice_template' => $data['invoiceTemplate'],
+            'invoice_paper' => $data['invoicePaper'],
+            'quotation_template' => $data['quotationTemplate'],
+            'quotation_paper' => $data['quotationPaper'],
             'receipt_width' => $data['receiptWidth'],
         ]);
 

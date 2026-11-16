@@ -58,6 +58,19 @@ enum InvoiceTemplate: string
         return ['A4', 'A5', '80mm', '58mm'];
     }
 
+    /**
+     * Values for templates that can be used for A4/A5 documents (no thermal).
+     *
+     * @return list<string>
+     */
+    public static function nonThermalValues(): array
+    {
+        return array_values(array_map(
+            fn (self $t) => $t->value,
+            array_filter(self::cases(), fn (self $t) => ! $t->isThermal())
+        ));
+    }
+
     /** Default template for the application. */
     public static function default(): self
     {

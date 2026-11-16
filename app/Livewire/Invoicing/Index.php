@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Invoicing;
 
-use App\Enums\InvoiceTemplate;
 use App\Exceptions\InsufficientStockException;
 use App\Livewire\Actions\Invoicing\CreateInvoiceDraft;
 use App\Livewire\Actions\Invoicing\DeleteInvoiceDraft;
@@ -15,7 +14,6 @@ use App\Models\InvoiceDocument;
 use App\Models\Location;
 use App\Models\Product;
 use App\Services\Invoicing\InvoiceCalculator;
-use App\Services\Settings\Settings;
 use Carbon\Carbon;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -109,25 +107,12 @@ class Index extends Component
 
     public ?string $voidError = null;
 
-    // ─── Print / PDF ──────────────────────────────────────────────────────
-    public string $printTemplate = 'classic';
-
-    public string $printPaper = 'A4';
-
     // ─────────────────────────────────────────────────────────────────────
 
-    public function mount(Settings $settings): void
+    public function mount(): void
     {
         $this->authorize('viewAny', Invoice::class);
         $this->issueDate = now()->toDateString();
-        $this->printTemplate = (string) $settings->get('invoicing.default_template', InvoiceTemplate::default()->value);
-        $this->printPaper = (string) $settings->get('invoicing.default_paper', InvoiceTemplate::default()->defaultPaper());
-    }
-
-    public function updatedPrintTemplate(): void
-    {
-        $template = InvoiceTemplate::tryFrom($this->printTemplate) ?? InvoiceTemplate::default();
-        $this->printPaper = $template->defaultPaper();
     }
 
     public function updatedSearch(): void
@@ -619,14 +604,11 @@ class Index extends Component
                 ->all();
         }
 
-        // Template options for the picker
-        $templates = InvoiceTemplate::cases();
-
         return view('livewire.invoicing.index', compact(
             'invoices', 'customerResults', 'productResults',
             'liveTotals', 'stockHints', 'locations',
             'selectedInvoice', 'issuingInvoice',
-            'printDocuments', 'templates'
+            'printDocuments'
         ));
     }
 

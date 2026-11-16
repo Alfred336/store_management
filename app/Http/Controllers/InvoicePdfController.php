@@ -6,7 +6,7 @@ use App\Enums\InvoiceTemplate;
 use App\Livewire\Actions\Invoicing\RenderInvoiceDocument;
 use App\Models\Invoice;
 use App\Models\InvoiceDocument;
-use Illuminate\Http\Request;
+use App\Services\Settings\Settings;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -16,25 +16,34 @@ class InvoicePdfController extends Controller
     /**
      * Render and stream an invoice PDF.
      *
+     * Template and paper are read from Business Settings and cannot be
+     * overridden via request params.  POS-channel invoices always use the
+     * thermal layout at the configured receipt width.
+     *
      * Query parameters:
-     *   template  – InvoiceTemplate value (defaults to invoice's template_key or 'classic')
-     *   paper     – paper size; must be in template->supportedPapers() (defaults to template default)
-     *   mode      – 'inline' | 'download' | 'save' (defaults to 'inline')
+     *   mode – 'inline' | 'download' | 'save' (defaults to 'inline')
      */
-    public function render(Invoice $invoice, Request $request, RenderInvoiceDocument $renderInvoiceDocument): Response
+    public function render(Invoice $invoice, Settings $settings, RenderInvoiceDocument $renderInvoiceDocument): Response
     {
         $this->authorize('print', $invoice);
 
-        $templateKey = $request->input('template', $invoice->template_key ?? InvoiceTemplate::default()->value);
-        $template = InvoiceTemplate::tryFrom((string) $templateKey);
-        abort_if($template === null, 422, 'Invalid template.');
+        // Determine template and paper from settings; POS channel is always thermal.
+        if ($invoice->channel === 'pos') {
+            $template = InvoiceTemplate::Thermal;
+            $paper = (string) $settings->get('pos.receipt_width', '80mm');
+        } else {
+            $templateKey = (string) $settings->get('invoicing.invoice_template', InvoiceTemplate::default()->value);
+            $template = InvoiceTemplate::tryFrom($templateKey) ?? InvoiceTemplate::default();
+            if ($template->isThermal()) {
+                $template = InvoiceTemplate::default();
+            }
+            $paper = (string) $settings->get('invoicing.invoice_paper', $template->defaultPaper());
+            if (! in_array($paper, $template->supportedPapers(), true)) {
+                $paper = $template->defaultPaper();
+            }
+        }
 
-        $paper = (string) $request->input('paper', $template->defaultPaper());
-        abort_unless(in_array($paper, $template->supportedPapers(), true), 422, 'Invalid paper size for this template.');
-
-        $mode = in_array($request->input('mode'), ['inline', 'download', 'save'], true)
-            ? $request->input('mode')
-            : 'inline';
+        $mode = request()->input('mode');
         $action = match ($mode) {
             'download' => 'download',
             'save' => 'save',

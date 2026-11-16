@@ -1,29 +1,11 @@
 <section class="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-700 dark:bg-zinc-800/30">
     <flux:heading size="sm">Print / Download</flux:heading>
 
-    {{-- Template and paper pickers --}}
-    <div class="grid gap-3 sm:grid-cols-2">
-        <flux:select wire:model.live="printTemplate" label="Template" size="sm">
-            @foreach($templates as $tmpl)
-                <option value="{{ $tmpl->value }}">{{ $tmpl->label() }}</option>
-            @endforeach
-        </flux:select>
-
-        <flux:select wire:model="printPaper" label="Paper" size="sm">
-            @php
-                $supportedPapers = \App\Enums\InvoiceTemplate::tryFrom($printTemplate)?->supportedPapers() ?? ['A4'];
-            @endphp
-            @foreach($supportedPapers as $sz)
-                <option value="{{ $sz }}">{{ $sz }}</option>
-            @endforeach
-        </flux:select>
-    </div>
-
-    {{-- Preview iframe + action buttons --}}
+    {{-- Preview iframe --}}
     @if($inv->status->isPosted())
     <div>
         <iframe
-            src="{{ route('invoices.pdf', ['invoice' => $inv->id, 'template' => $printTemplate, 'paper' => $printPaper, 'mode' => 'inline']) }}"
+            src="{{ route('invoices.pdf', ['invoice' => $inv->id, 'mode' => 'inline']) }}"
             class="h-64 w-full rounded-lg border border-zinc-200 dark:border-zinc-700"
             title="Invoice preview"
         ></iframe>
@@ -33,7 +15,7 @@
     <div class="flex flex-wrap gap-2">
         <flux:button
             as="a"
-            href="{{ route('invoices.pdf', ['invoice' => $inv->id, 'template' => $printTemplate, 'paper' => $printPaper, 'mode' => 'inline']) }}"
+            href="{{ route('invoices.pdf', ['invoice' => $inv->id, 'mode' => 'inline']) }}"
             target="_blank"
             variant="primary"
             size="sm"
@@ -44,7 +26,7 @@
 
         <flux:button
             as="a"
-            href="{{ route('invoices.pdf', ['invoice' => $inv->id, 'template' => $printTemplate, 'paper' => $printPaper, 'mode' => 'download']) }}"
+            href="{{ route('invoices.pdf', ['invoice' => $inv->id, 'mode' => 'download']) }}"
             variant="ghost"
             size="sm"
             icon="arrow-down-tray"
@@ -54,7 +36,7 @@
 
         <flux:button
             as="a"
-            href="{{ route('invoices.pdf', ['invoice' => $inv->id, 'template' => $printTemplate, 'paper' => $printPaper, 'mode' => 'save']) }}"
+            href="{{ route('invoices.pdf', ['invoice' => $inv->id, 'mode' => 'save']) }}"
             variant="ghost"
             size="sm"
             icon="folder-arrow-down"

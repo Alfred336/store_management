@@ -47,26 +47,44 @@
         </section>
 
         <section class="grid gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900 md:grid-cols-2">
-            <flux:heading class="md:col-span-2">Invoice printing defaults</flux:heading>
-            <flux:select wire:model.live="defaultTemplate" label="Default template">
+            <flux:heading class="md:col-span-2">Invoice template</flux:heading>
+            <flux:subheading class="md:col-span-2 -mt-2 text-sm text-zinc-500">Used when printing or downloading A4/A5 back-office invoices.</flux:subheading>
+            <flux:select wire:model="invoiceTemplate" label="Template">
                 <option value="classic">Classic</option>
                 <option value="modern">Modern</option>
                 <option value="minimal">Minimal</option>
                 <option value="compact">Compact (A5)</option>
-                <option value="thermal">Thermal receipt</option>
             </flux:select>
-            <flux:select wire:model="defaultPaper" label="Default paper size">
+            <flux:select wire:model="invoicePaper" label="Paper size">
                 <option value="A4">A4</option>
                 <option value="A5">A5</option>
-                <option value="80mm">80 mm receipt</option>
-                <option value="58mm">58 mm receipt</option>
-            </flux:select>
-            <flux:select wire:model="receiptWidth" label="POS receipt width">
-                <option value="80mm">80 mm</option>
-                <option value="58mm">58 mm</option>
             </flux:select>
             <flux:textarea wire:model="bankDetails" label="Bank details (shown on invoices)" rows="3" class="md:col-span-2" />
             <flux:textarea wire:model="footerTerms" label="Default footer / payment terms" rows="2" class="md:col-span-2" />
+        </section>
+
+        <section class="grid gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900 md:grid-cols-2">
+            <flux:heading class="md:col-span-2">Quotation template</flux:heading>
+            <flux:subheading class="md:col-span-2 -mt-2 text-sm text-zinc-500">Used when printing or emailing quotations.</flux:subheading>
+            <flux:select wire:model="quotationTemplate" label="Template">
+                <option value="classic">Classic</option>
+                <option value="modern">Modern</option>
+                <option value="minimal">Minimal</option>
+                <option value="compact">Compact (A5)</option>
+            </flux:select>
+            <flux:select wire:model="quotationPaper" label="Paper size">
+                <option value="A4">A4</option>
+                <option value="A5">A5</option>
+            </flux:select>
+        </section>
+
+        <section class="grid gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900 md:grid-cols-2">
+            <flux:heading class="md:col-span-2">POS receipts</flux:heading>
+            <flux:subheading class="md:col-span-2 -mt-2 text-sm text-zinc-500">POS invoices and payment receipts always print on thermal paper at this width.</flux:subheading>
+            <flux:select wire:model="receiptWidth" label="Receipt width">
+                <option value="80mm">80 mm</option>
+                <option value="58mm">58 mm</option>
+            </flux:select>
         </section>
 
         <div class="flex justify-end"><flux:button variant="primary" type="submit">Save settings</flux:button></div>

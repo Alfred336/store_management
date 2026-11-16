@@ -16,6 +16,7 @@ use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -61,6 +62,23 @@ class Index extends Component
 
     /** @var string[] */
     public array $roles = [];
+
+    // ─── Password / reset form fields ────────────────────────────────────────
+
+    /** 'generate' | 'manual' */
+    public string $passwordMode = 'generate';
+
+    public string $plainPassword = '';
+
+    public string $plainPasswordConfirmation = '';
+
+    public bool $mustChangePassword = true;
+
+    /** Send the manually-typed password by email (manual mode only). */
+    public bool $emailPassword = false;
+
+    /** Edit-form toggle: only perform a reset when explicitly checked. */
+    public bool $doResetPassword = false;
 
     // ─── Anonymize email confirmation ────────────────────────────────────────
 
@@ -146,27 +164,51 @@ class Index extends Component
         $this->name = trim($this->name);
         $this->email = strtolower(trim($this->email));
 
+        $defaultsRule = Password::defaults();
+        $manualPasswordRules = array_values(array_filter(
+            ['required', 'string', 'min:8', 'same:plainPasswordConfirmation', $defaultsRule]
+        ));
+
         $data = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
+            'passwordMode' => ['required', Rule::in(['generate', 'manual'])],
+            'mustChangePassword' => ['boolean'],
+            'plainPassword' => $this->passwordMode === 'manual' ? $manualPasswordRules : ['nullable'],
+            'plainPasswordConfirmation' => $this->passwordMode === 'manual' ? ['required', 'string'] : ['nullable'],
+            'emailPassword' => ['boolean'],
         ]);
 
+        $willEmail = $this->passwordMode === 'generate' || $this->emailPassword;
+
         try {
-            $createUser($data['name'], $data['email'], $data['roles']);
+            $createUser(
+                $data['name'],
+                $data['email'],
+                $data['roles'],
+                $data['passwordMode'],
+                $this->passwordMode === 'manual' ? $this->plainPassword : null,
+                (bool) $data['mustChangePassword'],
+                $willEmail,
+            );
         } catch (\Throwable $e) {
             report($e);
-            $this->addError('error', 'Could not send the welcome email. Please try again or check your mail settings.');
+            $this->addError('error', 'Could not create the user. Please try again or check your mail settings.');
 
             return;
         }
 
+        $successText = $willEmail
+            ? 'User created. A welcome email has been sent with their temporary password.'
+            : 'User created.';
+
         $this->closeForm();
-        Flux::toast(variant: 'success', text: 'User created. A welcome email has been sent with their temporary password.');
+        Flux::toast(variant: 'success', text: $successText);
     }
 
-    public function update(UpdateUser $updateUser): void
+    public function update(UpdateUser $updateUser, ResetUserPassword $resetUserPassword): void
     {
         $user = User::query()->findOrFail($this->requiredUserId());
         $this->authorize('update', $user);
@@ -181,9 +223,48 @@ class Index extends Component
             'roles.*' => ['string', Rule::exists('roles', 'name')],
         ]);
 
+        if ($this->doResetPassword) {
+            abort_unless(auth()->user()?->can('users.reset_password'), 403);
+
+            $defaultsRule = Password::defaults();
+            $manualPasswordRules = array_values(array_filter(
+                ['required', 'string', 'min:8', 'same:plainPasswordConfirmation', $defaultsRule]
+            ));
+
+            $this->validate([
+                'passwordMode' => ['required', Rule::in(['generate', 'manual'])],
+                'mustChangePassword' => ['boolean'],
+                'plainPassword' => $this->passwordMode === 'manual' ? $manualPasswordRules : ['nullable'],
+                'plainPasswordConfirmation' => $this->passwordMode === 'manual' ? ['required', 'string'] : ['nullable'],
+                'emailPassword' => ['boolean'],
+            ]);
+        }
+
         $updateUser($user, $data['name'], $data['email'], $data['roles']);
+
+        if ($this->doResetPassword) {
+            $willEmail = $this->passwordMode === 'generate' || $this->emailPassword;
+
+            try {
+                $resetUserPassword(
+                    $user,
+                    $this->passwordMode,
+                    $this->passwordMode === 'manual' ? $this->plainPassword : null,
+                    $this->mustChangePassword,
+                    $willEmail,
+                );
+            } catch (\Throwable $e) {
+                report($e);
+                $this->addError('error', 'Profile saved, but the password reset email could not be sent. Please try again or check your mail settings.');
+
+                return;
+            }
+        }
+
+        $successText = $this->doResetPassword ? 'User updated and password reset.' : 'User updated.';
+
         $this->closeForm();
-        Flux::toast(variant: 'success', text: 'User updated.');
+        Flux::toast(variant: 'success', text: $successText);
     }
 
     // ─── Details panel ──────────────────────────────────────────────────────
@@ -232,21 +313,13 @@ class Index extends Component
 
     // ─── Reset password ─────────────────────────────────────────────────────
 
-    public function resetPassword(int $id, ResetUserPassword $resetUserPassword): void
+    public function resetPassword(int $id): void
     {
         $user = User::query()->findOrFail($id);
         $this->authorize('resetPassword', $user);
 
-        try {
-            $resetUserPassword($user);
-        } catch (\Throwable $e) {
-            report($e);
-            Flux::toast(variant: 'danger', text: 'Could not send the password reset email. Please try again or check your mail settings.');
-
-            return;
-        }
-
-        Flux::toast(variant: 'success', text: 'Password reset. A new temporary password has been emailed to the user.');
+        // Open the edit form — the Reset password section is in the form.
+        $this->openEdit($id);
     }
 
     // ─── Reset 2FA ──────────────────────────────────────────────────────────
@@ -368,6 +441,12 @@ class Index extends Component
         $this->name = '';
         $this->email = '';
         $this->roles = [];
+        $this->passwordMode = 'generate';
+        $this->plainPassword = '';
+        $this->plainPasswordConfirmation = '';
+        $this->mustChangePassword = true;
+        $this->emailPassword = false;
+        $this->doResetPassword = false;
         $this->resetValidation();
     }
 

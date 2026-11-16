@@ -15,8 +15,10 @@ use Spatie\Permission\Models\Role;
 
 /**
  * Create a new user account with one or more roles.
- * Generates a temporary password, emails it to the user, and returns the new user.
- * Mail failure rolls back the entire transaction so no half-created user is left behind.
+ *
+ * Password may be generated automatically (default) or supplied by the admin.
+ * When the password will be emailed the mail is sent inside the transaction so
+ * a mail failure rolls back the entire operation — no half-created user is left.
  *
  * @return array{user: User}
  */
@@ -24,12 +26,17 @@ class CreateUser
 {
     /**
      * @param  string[]  $roleNames
+     * @param  'generate'|'manual'  $passwordMode
      * @return array{user: User}
      */
     public function __invoke(
         string $name,
         string $email,
         array $roleNames,
+        string $passwordMode = 'generate',
+        ?string $plainPassword = null,
+        bool $mustChange = true,
+        bool $emailPassword = true,
     ): array {
         Gate::authorize('create', User::class);
 
@@ -41,9 +48,14 @@ class CreateUser
 
         $this->validateRoleAssignment($actor, $roleNames);
 
-        $password = Str::password(16);
+        if ($passwordMode === 'manual' && empty($plainPassword)) {
+            throw ValidationException::withMessages(['plainPassword' => 'Password is required.']);
+        }
 
-        $user = DB::transaction(function () use ($name, $email, $roleNames, $password): User {
+        $password = $passwordMode === 'generate' ? Str::password(16) : $plainPassword;
+        $willEmail = $passwordMode === 'generate' || $emailPassword;
+
+        $user = DB::transaction(function () use ($name, $email, $roleNames, $password, $mustChange, $willEmail, $passwordMode): User {
             if (User::where('email', $email)->exists()) {
                 throw ValidationException::withMessages(['email' => 'A user with this email already exists.']);
             }
@@ -54,7 +66,7 @@ class CreateUser
                 'password' => Hash::make($password),
                 'email_verified_at' => now(),
                 'is_active' => true,
-                'must_change_password' => true,
+                'must_change_password' => $mustChange,
             ]);
 
             $user->syncRoles($roleNames);
@@ -63,11 +75,15 @@ class CreateUser
                 'name' => $user->name,
                 'email' => $user->email,
                 'roles' => $roleNames,
+                'pwd_mode' => $passwordMode,
+                'must_change' => $mustChange,
+                'emailed' => $willEmail,
             ]);
 
-            // Send the welcome email inside the transaction so a mail failure causes
-            // the entire transaction to roll back — no user is left without credentials.
-            Mail::to($user)->send(new TemporaryPasswordMail($user, $password));
+            if ($willEmail) {
+                // Mail inside the transaction: failure rolls back user creation entirely.
+                Mail::to($user)->send(new TemporaryPasswordMail($user, $password));
+            }
 
             return $user;
         });

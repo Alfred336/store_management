@@ -81,7 +81,7 @@
                         <flux:button size="sm" icon="pencil" wire:click="openEdit({{ $selectedUser->id }})">Edit</flux:button>
                     @endcan
                     @can('users.reset_password')
-                        <flux:button size="sm" icon="key" wire:click="resetPassword({{ $selectedUser->id }})" wire:confirm="Reset password for {{ $selectedUser->name }}?">Reset password</flux:button>
+                        <flux:button size="sm" icon="key" wire:click="resetPassword({{ $selectedUser->id }})">Reset password</flux:button>
                         @if ($selectedUser->two_factor_confirmed_at)
                             <flux:button size="sm" icon="shield-exclamation" wire:click="resetTwoFactor({{ $selectedUser->id }})" wire:confirm="Clear 2FA for {{ $selectedUser->name }}?">Reset 2FA</flux:button>
                         @endif
