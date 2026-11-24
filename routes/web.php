@@ -6,6 +6,7 @@ use App\Http\Controllers\InvoicePdfController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\QuotationPdfController;
 use App\Http\Controllers\Reports\ReportPdfController;
+use App\Livewire\Access\NoLocation;
 use App\Livewire\Auth\ChangePassword;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Customers\Index as CustomersIndex;
@@ -41,6 +42,12 @@ Route::livewire('setup', SetupIndex::class)->name('setup.index');
 // can reach it without being redirected in a loop.
 Route::middleware(['auth'])->group(function (): void {
     Route::livewire('password/change', ChangePassword::class)->name('password.change');
+});
+
+// No-location holding page — shown to authenticated non-Admin users with no assigned location.
+// Lives outside the main group so EnsureLocationAccess never redirects it into a loop.
+Route::middleware(['auth'])->group(function (): void {
+    Route::livewire('no-location', NoLocation::class)->name('location.none');
 });
 
 Route::middleware(['auth'])->group(function (): void {

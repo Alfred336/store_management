@@ -35,6 +35,7 @@ function docUser(array $permissions): User
     }
 
     $user->givePermissionTo($permissions);
+    $user->locations()->sync([makeTestLocation()->id]);
 
     return $user;
 }

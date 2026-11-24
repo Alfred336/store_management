@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnforceActiveUser;
 use App\Http\Middleware\EnforceMustChangePassword;
 use App\Http\Middleware\EnsureInitialSetup;
+use App\Http\Middleware\EnsureLocationAccess;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', EnsureInitialSetup::class);
         $middleware->appendToGroup('web', EnforceActiveUser::class);
         $middleware->appendToGroup('web', EnforceMustChangePassword::class);
+        $middleware->appendToGroup('web', EnsureLocationAccess::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

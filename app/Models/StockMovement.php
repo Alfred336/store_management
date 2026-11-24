@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\Access\LocationAccess;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -51,5 +53,19 @@ class StockMovement extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** @param Builder<StockMovement> $query */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = app(LocationAccess::class)->allowedLocationIds($user);
+        if ($ids === null) {
+            return $query;
+        }
+        if (empty($ids)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('stock_movements.location_id', $ids);
     }
 }

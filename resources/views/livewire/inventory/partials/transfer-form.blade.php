@@ -28,7 +28,7 @@
                 <flux:label required>To location</flux:label>
                 <flux:select wire:model="transferToLocationId">
                     <option value="">Select…</option>
-                    @foreach ($locations as $loc)
+                    @foreach ($allActiveLocations as $loc)
                         <option value="{{ $loc->id }}">{{ $loc->name }}</option>
                     @endforeach
                 </flux:select>

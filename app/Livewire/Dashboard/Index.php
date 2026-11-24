@@ -22,8 +22,7 @@ class Index extends Component
 
     public function mount(): void
     {
-        // Any authenticated user may visit the dashboard; sections are gated by permission.
-        abort_unless(auth()->check(), 403);
+        abort_unless(auth()->user()?->can('dashboard.view'), 403);
     }
 
     // ─── Computed helpers ─────────────────────────────────────────────────
@@ -63,7 +62,7 @@ class Index extends Component
 
     public function render(): View
     {
-        abort_unless(auth()->check(), 403);
+        abort_unless(auth()->user()?->can('dashboard.view'), 403);
 
         $svc = app(DashboardService::class);
         $locId = $this->resolvedLocationId();

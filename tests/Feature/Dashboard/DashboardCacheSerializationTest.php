@@ -36,10 +36,12 @@ uses(RefreshDatabase::class);
 function serUser(array $perms = []): User
 {
     $user = User::factory()->create();
-    foreach ($perms as $p) {
+    $allPerms = array_unique(array_merge($perms, ['dashboard.view']));
+    foreach ($allPerms as $p) {
         Permission::findOrCreate($p, 'web');
     }
-    $user->givePermissionTo($perms);
+    $user->givePermissionTo($allPerms);
+    $user->locations()->sync([makeTestLocation()->id]);
 
     return $user;
 }

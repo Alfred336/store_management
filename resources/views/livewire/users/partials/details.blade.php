@@ -31,6 +31,20 @@
                     </div>
                 </div>
                 <div>
+                    <flux:text class="font-medium">Locations</flux:text>
+                    @if ($selectedUser->hasRole('Admin'))
+                        <flux:text class="mt-1 text-zinc-500">All (Admin)</flux:text>
+                    @elseif ($selectedUser->locations->isEmpty())
+                        <flux:text class="mt-1 text-zinc-500">None assigned</flux:text>
+                    @else
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            @foreach ($selectedUser->locations as $loc)
+                                <flux:badge variant="outline">{{ $loc->name }}</flux:badge>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+                <div>
                     <flux:text class="font-medium">Last login</flux:text>
                     <flux:text class="mt-1 text-zinc-500">
                         {{ $selectedUser->last_login_at ? $selectedUser->last_login_at->format('d M Y H:i') : 'Never' }}

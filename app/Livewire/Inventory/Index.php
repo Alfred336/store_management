@@ -11,6 +11,7 @@ use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockLevel;
+use App\Services\Access\LocationAccess;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
@@ -185,6 +186,11 @@ class Index extends Component
             'receiveQuantity' => ['required', 'numeric', 'decimal:0,3', 'gt:0'],
         ]);
 
+        abort_unless(
+            app(LocationAccess::class)->canAccess(auth()->user(), (int) $this->receiveLocationId),
+            403
+        );
+
         try {
             $action([
                 'product_id' => $this->receiveProductId,
@@ -251,6 +257,11 @@ class Index extends Component
             'adjustReason' => ['required', 'string', 'max:500'],
         ]);
 
+        abort_unless(
+            app(LocationAccess::class)->canAccess(auth()->user(), (int) $this->adjustLocationId),
+            403
+        );
+
         try {
             $action([
                 'product_id' => $this->adjustProductId,
@@ -314,6 +325,11 @@ class Index extends Component
             'transferQuantity' => ['required', 'numeric', 'decimal:0,3', 'gt:0'],
         ]);
 
+        abort_unless(
+            app(LocationAccess::class)->canAccess(auth()->user(), (int) $this->transferFromLocationId),
+            403
+        );
+
         try {
             $action([
                 'product_id' => $this->transferProductId,
@@ -359,14 +375,20 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('inventory.view'), 403);
 
-        $levels = $this->buildQuery()->paginate(50);
+        $access = app(LocationAccess::class);
+        $allowedIds = $access->allowedLocationIds(auth()->user());
 
-        // Per-product alert badges — derived from the same scopes used everywhere else
+        $levels = $this->buildQuery($allowedIds)->paginate(50);
+
+        // Per-product alert badges — scoped to the user's allowed locations only
         $productIds = $levels->pluck('product_id')->unique()->values()->all();
-        $lowStockIds = Product::lowStock()->whereIn('id', $productIds)->pluck('id');
-        $outOfStockIds = Product::outOfStock()->whereIn('id', $productIds)->pluck('id');
+        $lowStockIds = Product::lowStock($allowedIds)->whereIn('id', $productIds)->pluck('id');
+        $outOfStockIds = Product::outOfStock($allowedIds)->whereIn('id', $productIds)->pluck('id');
 
-        $locations = Location::query()->where('is_active', true)->orderBy('name')->get();
+        // Allowed locations: used for filter dropdown, receive/adjust/transfer-from selects.
+        // Transfer-to may target any active location (stock can be sent anywhere).
+        $locations = $access->allowedLocations(auth()->user());
+        $allActiveLocations = Location::query()->where('is_active', true)->orderBy('name')->get();
         $categories = Category::query()->orderBy('name')->get();
 
         // Batches for the receive form's "existing batch" dropdown
@@ -392,14 +414,17 @@ class Index extends Component
 
         return view('livewire.inventory.index', compact(
             'levels', 'lowStockIds', 'outOfStockIds',
-            'locations', 'categories',
+            'locations', 'allActiveLocations', 'categories',
             'receiveBatches', 'receiveProduct',
             'adjustProduct', 'transferProduct'
         ));
     }
 
-    /** @return Builder<StockLevel> */
-    private function buildQuery(): Builder
+    /**
+     * @param  list<int>|null  $allowedIds
+     * @return Builder<StockLevel>
+     */
+    private function buildQuery(?array $allowedIds): Builder
     {
         return StockLevel::query()
             ->select('stock_levels.*')
@@ -408,6 +433,7 @@ class Index extends Component
             ->leftJoin('batches', 'batches.id', '=', 'stock_levels.batch_id')
             ->join('locations', 'locations.id', '=', 'stock_levels.location_id')
             ->whereNull('products.deleted_at')
+            ->when($allowedIds !== null, fn (Builder $q) => $q->whereIn('stock_levels.location_id', $allowedIds))
             ->with(['product.baseUnit', 'location', 'batch'])
             ->when($this->search !== '', function (Builder $q): void {
                 $pattern = '%'.$this->search.'%';
@@ -420,10 +446,10 @@ class Index extends Component
             ->when($this->locationFilter !== '', fn (Builder $q) => $q->where('stock_levels.location_id', (int) $this->locationFilter))
             ->when($this->categoryFilter !== '', fn (Builder $q) => $q->where('products.category_id', (int) $this->categoryFilter))
             ->when($this->outOfStockOnly, fn (Builder $q) => $q
-                ->whereIn('stock_levels.product_id', Product::outOfStock()->select('id'))
+                ->whereIn('stock_levels.product_id', Product::outOfStock($allowedIds)->select('id'))
             )
             ->when($this->lowStockOnly, fn (Builder $q) => $q
-                ->whereIn('stock_levels.product_id', Product::lowStock()->select('id'))
+                ->whereIn('stock_levels.product_id', Product::lowStock($allowedIds)->select('id'))
             )
             ->when($this->expiringDays > 0, fn (Builder $q) => $q
                 ->whereNotNull('stock_levels.batch_id')

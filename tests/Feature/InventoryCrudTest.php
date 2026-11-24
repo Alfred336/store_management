@@ -225,11 +225,13 @@ test('product component normalizes unique skus saves packaging and protects stoc
         ->call('update')
         ->assertHasErrors('sku');
 
+    $stockLocation = Location::factory()->create();
     app(StockService::class)->receive([
         'product_id' => $product->id,
-        'location_id' => Location::factory()->create()->id,
+        'location_id' => $stockLocation->id,
         'quantity' => '1.000',
     ]);
+    $user->locations()->sync([$stockLocation->id]);
 
     $secondUnit = Unit::factory()->create();
     Livewire::actingAs($user)->test(ProductsIndex::class)

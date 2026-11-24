@@ -20,6 +20,35 @@
                 @error('roles') <flux:error>{{ $message }}</flux:error> @enderror
                 @error('roles.*') <flux:error>{{ $message }}</flux:error> @enderror
             </div>
+
+            {{-- ── Locations ───────────────────────────────────────────────── --}}
+            <div>
+                <flux:label>Locations</flux:label>
+                @php $assigningAdmin = in_array('Admin', $roles, true); @endphp
+                @if ($assigningAdmin)
+                    <flux:text class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">All locations (Admin)</flux:text>
+                @else
+                    @php
+                        // Non-admin actors may only tick their own locations.
+                        $assignableLocations = $actorAllowedLocationIds === null
+                            ? $activeLocations
+                            : $activeLocations->whereIn('id', $actorAllowedLocationIds);
+                    @endphp
+                    <div class="mt-2 space-y-2">
+                        @forelse ($assignableLocations as $location)
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="checkbox" wire:model="locationIds" value="{{ $location->id }}"
+                                       class="rounded border-zinc-300 dark:border-zinc-600" />
+                                {{ $location->name }}
+                                <span class="text-xs text-zinc-400">{{ $location->type }}</span>
+                            </label>
+                        @empty
+                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">No active locations available.</flux:text>
+                        @endforelse
+                    </div>
+                @endif
+                @error('locationIds') <flux:error>{{ $message }}</flux:error> @enderror
+            </div>
         </div>
 
         {{-- ── Password section (create) ─────────────────────────────────── --}}

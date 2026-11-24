@@ -4,7 +4,9 @@ namespace App\Livewire\Actions\Users;
 
 use App\Mail\TemporaryPasswordMail;
 use App\Models\AdminAuditLog;
+use App\Models\Location;
 use App\Models\User;
+use App\Services\Access\LocationAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
@@ -27,6 +29,7 @@ class CreateUser
     /**
      * @param  string[]  $roleNames
      * @param  'generate'|'manual'  $passwordMode
+     * @param  int[]  $locationIds  Active location IDs to assign; ignored for Admin role.
      * @return array{user: User}
      */
     public function __invoke(
@@ -37,6 +40,7 @@ class CreateUser
         ?string $plainPassword = null,
         bool $mustChange = true,
         bool $emailPassword = true,
+        array $locationIds = [],
     ): array {
         Gate::authorize('create', User::class);
 
@@ -48,6 +52,11 @@ class CreateUser
 
         $this->validateRoleAssignment($actor, $roleNames);
 
+        $assigningAdmin = in_array('Admin', $roleNames, true);
+        if (! $assigningAdmin) {
+            $this->validateLocationAssignment($actor, $locationIds);
+        }
+
         if ($passwordMode === 'manual' && empty($plainPassword)) {
             throw ValidationException::withMessages(['plainPassword' => 'Password is required.']);
         }
@@ -55,7 +64,7 @@ class CreateUser
         $password = $passwordMode === 'generate' ? Str::password(16) : $plainPassword;
         $willEmail = $passwordMode === 'generate' || $emailPassword;
 
-        $user = DB::transaction(function () use ($name, $email, $roleNames, $password, $mustChange, $willEmail, $passwordMode): User {
+        $user = DB::transaction(function () use ($name, $email, $roleNames, $password, $mustChange, $willEmail, $passwordMode, $locationIds, $assigningAdmin): User {
             if (User::where('email', $email)->exists()) {
                 throw ValidationException::withMessages(['email' => 'A user with this email already exists.']);
             }
@@ -71,6 +80,10 @@ class CreateUser
 
             $user->syncRoles($roleNames);
 
+            if (! $assigningAdmin) {
+                $user->locations()->sync($locationIds);
+            }
+
             AdminAuditLog::record('user.created', User::class, $user->id, [
                 'name' => $user->name,
                 'email' => $user->email,
@@ -78,6 +91,7 @@ class CreateUser
                 'pwd_mode' => $passwordMode,
                 'must_change' => $mustChange,
                 'emailed' => $willEmail,
+                'locations' => $assigningAdmin ? 'all (Admin)' : $locationIds,
             ]);
 
             if ($willEmail) {
@@ -89,6 +103,40 @@ class CreateUser
         });
 
         return ['user' => $user];
+    }
+
+    /**
+     * Ensure the actor can assign the requested locations.
+     * Non-Admin actors may only assign locations they themselves hold.
+     *
+     * @param  int[]  $locationIds
+     */
+    private function validateLocationAssignment(?User $actor, array $locationIds): void
+    {
+        if ($actor === null) {
+            return;
+        }
+
+        if ($actor->hasRole('Admin')) {
+            return;
+        }
+
+        $allowed = app(LocationAccess::class)->allowedLocationIds($actor) ?? [];
+
+        foreach ($locationIds as $lid) {
+            if (! in_array((int) $lid, $allowed, true)) {
+                throw ValidationException::withMessages([
+                    'locations' => 'You can only assign locations you have access to yourself.',
+                ]);
+            }
+        }
+
+        // Verify every id actually maps to an active location
+        $valid = Location::whereIn('id', $locationIds)->where('is_active', true)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $invalid = array_diff(array_map(fn ($id) => (int) $id, $locationIds), $valid);
+        if (! empty($invalid)) {
+            throw ValidationException::withMessages(['locations' => 'One or more selected locations are invalid.']);
+        }
     }
 
     /**

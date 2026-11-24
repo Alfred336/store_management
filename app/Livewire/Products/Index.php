@@ -8,6 +8,7 @@ use App\Livewire\Actions\Products\UpdateProduct;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Unit;
+use App\Services\Access\LocationAccess;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
@@ -184,10 +185,14 @@ class Index extends Component
     /** Load and authorize product details before showing them. */
     public function show(int $id): void
     {
-        $product = Product::query()
-            ->with(['category', 'baseUnit', 'productUnits.unit'])
-            ->withSum('stockLevels as total_qty', 'quantity')
-            ->findOrFail($id);
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+        $q = Product::query()->with(['category', 'baseUnit', 'productUnits.unit']);
+        if ($allowedIds === null) {
+            $q->withSum('stockLevels as total_qty', 'quantity');
+        } else {
+            $q->withSum(['stockLevels as total_qty' => fn ($s) => $s->whereIn('location_id', $allowedIds)], 'quantity');
+        }
+        $product = $q->findOrFail($id);
         $this->authorize('view', $product);
         $this->productId = $product->id;
         $this->showDetails = true;
@@ -271,34 +276,44 @@ class Index extends Component
     {
         $this->authorize('viewAny', Product::class);
 
+        $access = app(LocationAccess::class);
+        $allowedIds = $access->allowedLocationIds(auth()->user());
+
         $sortBy = in_array($this->sortBy, ['sku', 'name', 'total_qty', 'reorder_level'], true) ? $this->sortBy : 'name';
         $sortDirection = in_array($this->sortDirection, ['asc', 'desc'], true) ? $this->sortDirection : 'asc';
         $activeFilter = in_array($this->activeFilter, ['all', 'active', 'inactive'], true) ? $this->activeFilter : 'all';
 
-        $products = Product::query()
-            ->with(['category', 'baseUnit'])
-            ->withSum('stockLevels as total_qty', 'quantity')
+        $productsQuery = Product::query()->with(['category', 'baseUnit']);
+        if ($allowedIds === null) {
+            $productsQuery->withSum('stockLevels as total_qty', 'quantity');
+        } else {
+            $productsQuery->withSum(['stockLevels as total_qty' => fn ($s) => $s->whereIn('location_id', $allowedIds)], 'quantity');
+        }
+        $products = $productsQuery
             ->when($this->search !== '', fn (Builder $query) => $query->search($this->search))
             ->when($activeFilter !== 'all', fn (Builder $query) => $query->where('is_active', $activeFilter === 'active'))
-            ->when($this->lowStockOnly, fn (Builder $query) => $query->lowStock())
+            ->when($this->lowStockOnly, fn (Builder $query) => $query->lowStock($allowedIds))
             ->orderBy($sortBy, $sortDirection)
             ->paginate(15);
 
         $lowStockIds = Product::query()
             ->whereKey($products->getCollection()->modelKeys())
-            ->lowStock()
+            ->lowStock($allowedIds)
             ->pluck('id');
 
         $outOfStockIds = Product::query()
             ->whereKey($products->getCollection()->modelKeys())
-            ->outOfStock()
+            ->outOfStock($allowedIds)
             ->pluck('id');
 
+        $selectedQuery = Product::query()->with(['category', 'baseUnit', 'productUnits.unit']);
+        if ($allowedIds === null) {
+            $selectedQuery->withSum('stockLevels as total_qty', 'quantity');
+        } else {
+            $selectedQuery->withSum(['stockLevels as total_qty' => fn ($s) => $s->whereIn('location_id', $allowedIds)], 'quantity');
+        }
         $selected = $this->showDetails && $this->productId !== null
-            ? Product::query()
-                ->with(['category', 'baseUnit', 'productUnits.unit'])
-                ->withSum('stockLevels as total_qty', 'quantity')
-                ->findOrFail($this->productId)
+            ? $selectedQuery->findOrFail($this->productId)
             : null;
 
         if ($selected) {

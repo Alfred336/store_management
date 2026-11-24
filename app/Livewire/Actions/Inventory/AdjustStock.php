@@ -3,6 +3,7 @@
 namespace App\Livewire\Actions\Inventory;
 
 use App\Models\StockMovement;
+use App\Services\Access\LocationAccess;
 use App\Services\StockService;
 
 /** Adjust stock at a location by a signed quantity. Reason is required. */
@@ -25,6 +26,7 @@ class AdjustStock
     public function __invoke(array $data): StockMovement
     {
         abort_unless(auth()->user()?->can('inventory.adjust'), 403);
+        app(LocationAccess::class)->ensure(auth()->user(), (int) $data['location_id']);
 
         return $this->stock->adjust([
             'product_id' => $data['product_id'],

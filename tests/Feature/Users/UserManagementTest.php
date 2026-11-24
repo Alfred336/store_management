@@ -42,6 +42,7 @@ function nonAdminUser(string $role = 'Cashier'): User
     app(EnsureSystemRoles::class)();
     $user = User::factory()->create(['is_active' => true]);
     $user->assignRole($role);
+    $user->locations()->sync([makeTestLocation()->id]);
 
     return $user;
 }
@@ -542,12 +543,14 @@ test('admin creates a user via the component and user gets role and must_change_
     Mail::fake();
 
     $admin = adminUser();
+    $loc = makeTestLocation();
     $this->actingAs($admin);
 
     Livewire::test(UsersIndex::class)
         ->set('name', 'New User')
         ->set('email', 'newuser@example.com')
         ->set('roles', ['Cashier'])
+        ->set('locationIds', [$loc->id])
         ->call('store')
         ->assertHasNoErrors();
 
@@ -573,6 +576,7 @@ test('submitting create form without a role shows roles validation error', funct
 
 test('create form shows error when mail fails and does not create the user', function (): void {
     $admin = adminUser();
+    $loc = makeTestLocation();
     $this->actingAs($admin);
 
     Mail::shouldReceive('to')->andThrow(new RuntimeException('SMTP error'));
@@ -581,6 +585,7 @@ test('create form shows error when mail fails and does not create the user', fun
         ->set('name', 'Mail Fail User')
         ->set('email', 'mailfail@example.com')
         ->set('roles', ['Cashier'])
+        ->set('locationIds', [$loc->id])
         ->call('store')
         ->assertHasErrors(['error']);
 

@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Inventory\Ledger;
 
-use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Services\Access\LocationAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\View\View;
 use Livewire\Attributes\Title;
@@ -84,8 +84,12 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('inventory.view'), 403);
 
+        $access = app(LocationAccess::class);
+        $allowedIds = $access->allowedLocationIds(auth()->user());
+
         $movements = StockMovement::query()
             ->with(['product.baseUnit', 'location', 'batch', 'user'])
+            ->when($allowedIds !== null, fn (Builder $q) => $q->whereIn('location_id', $allowedIds))
             ->when($this->search !== '', function (Builder $q): void {
                 $pattern = '%'.$this->search.'%';
                 $q->whereHas('product', fn (Builder $p) => $p
@@ -104,7 +108,7 @@ class Index extends Component
             ->paginate(50);
 
         $products = Product::query()->whereNull('deleted_at')->orderBy('name')->get();
-        $locations = Location::query()->orderBy('name')->get();
+        $locations = $access->allowedLocations(auth()->user());
         $users = User::query()->orderBy('name')->get();
 
         $movementTypes = [

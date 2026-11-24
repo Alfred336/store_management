@@ -3,6 +3,7 @@
 namespace App\Livewire\Actions\Inventory;
 
 use App\Models\StockMovement;
+use App\Services\Access\LocationAccess;
 use App\Services\StockService;
 
 /** Transfer stock between two different locations. */
@@ -26,6 +27,7 @@ class TransferStock
     public function __invoke(array $data): array
     {
         abort_unless(auth()->user()?->can('inventory.transfer'), 403);
+        app(LocationAccess::class)->ensure(auth()->user(), (int) $data['from_location_id']);
 
         return $this->stock->transfer([
             'product_id' => $data['product_id'],

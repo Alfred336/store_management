@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Services\Access\LocationAccess;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -87,5 +89,19 @@ class PosSession extends Model
     public function isOpen(): bool
     {
         return $this->status === 'open';
+    }
+
+    /** @param Builder<PosSession> $query */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = app(LocationAccess::class)->allowedLocationIds($user);
+        if ($ids === null) {
+            return $query;
+        }
+        if (empty($ids)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('pos_sessions.location_id', $ids);
     }
 }

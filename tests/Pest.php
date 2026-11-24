@@ -2,6 +2,7 @@
 
 use App\Livewire\Actions\Customers\EnsureWalkInCustomer;
 use App\Models\Customer;
+use App\Models\Location;
 use App\Services\Setup\SetupStatus;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -63,4 +64,14 @@ expect()->extend('toBeOne', function () {
 function ensureWalkInCustomerForTests(): Customer
 {
     return app(EnsureWalkInCustomer::class)();
+}
+
+/** Create an active location and optionally assign it to users. */
+function makeTestLocation(?string $name = null): Location
+{
+    return Location::factory()->create([
+        'name' => $name ?? ('Test Location '.uniqid()),
+        'type' => 'store',
+        'is_active' => true,
+    ]);
 }

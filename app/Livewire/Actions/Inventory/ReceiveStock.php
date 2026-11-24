@@ -5,6 +5,7 @@ namespace App\Livewire\Actions\Inventory;
 use App\Models\Batch;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Services\Access\LocationAccess;
 use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -38,6 +39,7 @@ class ReceiveStock
     public function __invoke(array $data): StockMovement
     {
         abort_unless(auth()->user()?->can('inventory.receive'), 403);
+        app(LocationAccess::class)->ensure(auth()->user(), (int) $data['location_id']);
 
         return DB::transaction(function () use ($data): StockMovement {
             $product = Product::query()

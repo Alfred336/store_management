@@ -37,6 +37,7 @@ function reportUser(array $permissions): User
         Permission::findOrCreate($perm, 'web');
     }
     $user->givePermissionTo($permissions);
+    $user->locations()->sync([makeTestLocation()->id]);
 
     return $user;
 }

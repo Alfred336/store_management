@@ -4,6 +4,10 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\Customer;
+use App\Models\Invoice;
+use App\Models\Product;
+use App\Models\Quotation;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -12,7 +16,9 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Fortify;
+use Symfony\Component\HttpFoundation\Response;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -21,7 +27,45 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Smart post-login redirect: dashboard → POS → inventory → invoices → quotations → customers → products.
+        $this->app->singleton(LoginResponse::class, function (): LoginResponse {
+            return new class implements LoginResponse
+            {
+                public function toResponse($request): Response
+                {
+                    /** @var User|null $user */
+                    $user = $request->user();
+
+                    if ($user === null) {
+                        return redirect()->route('login');
+                    }
+
+                    if ($user->can('dashboard.view')) {
+                        return redirect()->intended(route('dashboard'));
+                    }
+                    if ($user->can('pos.use')) {
+                        return redirect()->intended(route('pos.index'));
+                    }
+                    if ($user->can('inventory.view')) {
+                        return redirect()->intended(route('inventory.index'));
+                    }
+                    if ($user->can('viewAny', Invoice::class)) {
+                        return redirect()->intended(route('invoices.index'));
+                    }
+                    if ($user->can('viewAny', Quotation::class)) {
+                        return redirect()->intended(route('quotations.index'));
+                    }
+                    if ($user->can('viewAny', Customer::class)) {
+                        return redirect()->intended(route('customers.index'));
+                    }
+                    if ($user->can('viewAny', Product::class)) {
+                        return redirect()->intended(route('products.index'));
+                    }
+
+                    return redirect()->intended(route('dashboard'));
+                }
+            };
+        });
     }
 
     /**

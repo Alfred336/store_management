@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\QuotationStatus;
+use App\Services\Access\LocationAccess;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -164,5 +166,19 @@ class Quotation extends Model
     public function recipientName(): string
     {
         return $this->customer->name ?? $this->prospect_name ?? '—';
+    }
+
+    /** @param Builder<Quotation> $query */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = app(LocationAccess::class)->allowedLocationIds($user);
+        if ($ids === null) {
+            return $query;
+        }
+        if (empty($ids)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('quotations.location_id', $ids);
     }
 }

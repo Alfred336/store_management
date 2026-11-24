@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\InvoiceStatus;
+use App\Services\Access\LocationAccess;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -161,5 +163,19 @@ class Invoice extends Model
             && $this->due_date !== null
             && $this->due_date->isPast()
             && bccomp($this->balance(), '0', 2) > 0;
+    }
+
+    /** @param Builder<Invoice> $query */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = app(LocationAccess::class)->allowedLocationIds($user);
+        if ($ids === null) {
+            return $query;
+        }
+        if (empty($ids)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('invoices.location_id', $ids);
     }
 }

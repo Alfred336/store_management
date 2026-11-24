@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\Access\LocationAccess;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -34,5 +36,19 @@ class StockLevel extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(Batch::class);
+    }
+
+    /** @param Builder<StockLevel> $query */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = app(LocationAccess::class)->allowedLocationIds($user);
+        if ($ids === null) {
+            return $query;
+        }
+        if (empty($ids)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('stock_levels.location_id', $ids);
     }
 }

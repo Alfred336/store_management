@@ -42,6 +42,7 @@ function customerPermissionsUser(array $permissions): User
     }
 
     $user->givePermissionTo($permissions);
+    $user->locations()->sync([makeTestLocation()->id]);
 
     return $user;
 }
@@ -380,6 +381,7 @@ test('customer exports neutralize formula-leading cells in CSV and XLSX data', f
 
 test('customer imports and exports require the matching permissions', function () {
     $viewer = User::factory()->create();
+    $viewer->locations()->sync([makeTestLocation()->id]);
     $this->actingAs($viewer);
     expect(fn () => app(ImportCustomers::class)(UploadedFile::fake()->createWithContent('customers.csv', "name,type\nA,business\n")))
         ->toThrow(AuthorizationException::class);

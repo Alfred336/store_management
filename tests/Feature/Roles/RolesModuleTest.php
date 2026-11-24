@@ -34,6 +34,7 @@ function rolesCashier(): User
     app(EnsureSystemRoles::class)();
     $user = User::factory()->create(['is_active' => true]);
     $user->assignRole('Cashier');
+    $user->locations()->sync([makeTestLocation()->id]);
 
     return $user;
 }
@@ -43,6 +44,7 @@ function rolesViewer(): User
     app(EnsureSystemRoles::class)();
     $user = User::factory()->create(['is_active' => true]);
     $user->assignRole('Viewer');
+    $user->locations()->sync([makeTestLocation()->id]);
 
     return $user;
 }

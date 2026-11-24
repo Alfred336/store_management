@@ -10,11 +10,15 @@
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
+            @livewire('shared.location-switcher')
+
             <flux:sidebar.nav>
                 {{-- Dashboard --}}
+                @can('dashboard.view')
                 <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                     {{ __('Dashboard') }}
                 </flux:sidebar.item>
+                @endcan
 
                 {{-- Sales --}}
                 @if(auth()->user()?->can('viewAny', App\Models\Invoice::class) || auth()->user()?->can('viewAny', App\Models\Customer::class) || auth()->user()?->can('viewAny', App\Models\Payment::class) || auth()->user()?->can('pos.use') || auth()->user()?->can('viewAny', App\Models\Quotation::class))

@@ -206,7 +206,7 @@ class Index extends Component
     {
         return [
             'name' => ['required', 'string', 'max:255', Rule::unique('locations', 'name')->ignore($this->recordId)],
-            'type' => ['required', Rule::in(['store', 'warehouse', 'branch'])],
+            'type' => ['required', Rule::in(['store', 'warehouse', 'branch', 'workshop'])],
             'isActive' => ['required', 'boolean'],
         ];
     }

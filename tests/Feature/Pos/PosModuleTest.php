@@ -46,6 +46,7 @@ function posUser(array $extra = []): User
     }
 
     $user->givePermissionTo(array_merge($base, $extra));
+    $user->locations()->sync([makeTestLocation()->id]);
 
     return $user;
 }
@@ -464,7 +465,8 @@ test('void_held_sale_deletes_the_record', function (): void {
 
 test('pos_route_requires_pos_use_permission', function (): void {
     $user = User::factory()->create();
-    // no permissions
+    // no permissions, but needs a location to pass middleware
+    $user->locations()->sync([makeTestLocation()->id]);
 
     $this->actingAs($user);
 
@@ -588,6 +590,7 @@ test('viewer_cannot_open_the_pos', function (): void {
     $viewer = User::factory()->create();
     Permission::findOrCreate('inventory.view', 'web');
     $viewer->givePermissionTo('inventory.view');
+    $viewer->locations()->sync([makeTestLocation()->id]);
 
     $this->actingAs($viewer);
     $this->get(route('pos.index'))->assertStatus(403);
@@ -599,6 +602,7 @@ test('storekeeper_cannot_open_the_pos', function (): void {
     Permission::findOrCreate('inventory.view', 'web');
     Permission::findOrCreate('inventory.receive', 'web');
     $storekeeper->givePermissionTo(['inventory.view', 'inventory.receive']);
+    $storekeeper->locations()->sync([makeTestLocation()->id]);
 
     $this->actingAs($storekeeper);
     $this->get(route('pos.index'))->assertStatus(403);

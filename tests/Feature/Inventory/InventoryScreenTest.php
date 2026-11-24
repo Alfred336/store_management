@@ -89,6 +89,7 @@ test('receive non-batch product creates stock level and movement', function () {
     $keeper = inventoryUser(['inventory.view', 'inventory.receive']);
     $product = makeProduct(false);
     $location = Location::factory()->create();
+    $keeper->locations()->sync([$location->id]);
 
     Livewire::actingAs($keeper)->test(InventoryIndex::class)
         ->call('openReceive', $product->id, (string) $location->id)
@@ -108,6 +109,7 @@ test('receive batch product with new batch creates batch record', function () {
     $keeper = inventoryUser(['inventory.view', 'inventory.receive']);
     $product = makeProduct(true);
     $location = Location::factory()->create();
+    $keeper->locations()->sync([$location->id]);
 
     Livewire::actingAs($keeper)->test(InventoryIndex::class)
         ->call('openReceive', $product->id, (string) $location->id)
@@ -134,6 +136,7 @@ test('receive batch product with existing batch adds to that batch', function ()
     $keeper = inventoryUser(['inventory.view', 'inventory.receive']);
     $product = makeProduct(true);
     $location = Location::factory()->create();
+    $keeper->locations()->sync([$location->id]);
     $batch = Batch::factory()->create(['product_id' => $product->id, 'batch_number' => 'OLD-001']);
 
     // Initial stock
@@ -181,6 +184,7 @@ test('receive with packaging unit converts quantity to base unit', function () {
     $product = Product::factory()->create(['base_unit_id' => $baseUnit->id, 'track_batches' => false]);
     $product->productUnits()->create(['unit_id' => $carton->id, 'factor' => '24.000']);
     $location = Location::factory()->create();
+    $keeper->locations()->sync([$location->id]);
 
     Livewire::actingAs($keeper)->test(InventoryIndex::class)
         ->call('openReceive', $product->id, (string) $location->id)
@@ -203,6 +207,7 @@ test('positive adjustment increases stock level', function () {
     $keeper = inventoryUser(['inventory.view', 'inventory.adjust']);
     $product = makeProduct();
     $location = Location::factory()->create();
+    $keeper->locations()->sync([$location->id]);
 
     app(StockService::class)->receive([
         'product_id' => $product->id,
@@ -229,6 +234,7 @@ test('negative adjustment decreases stock level', function () {
     $keeper = inventoryUser(['inventory.view', 'inventory.adjust']);
     $product = makeProduct();
     $location = Location::factory()->create();
+    $keeper->locations()->sync([$location->id]);
 
     app(StockService::class)->receive([
         'product_id' => $product->id,
@@ -268,6 +274,7 @@ test('negative adjustment exceeding stock shows insufficient stock error', funct
     $keeper = inventoryUser(['inventory.view', 'inventory.adjust']);
     $product = makeProduct();
     $location = Location::factory()->create();
+    $keeper->locations()->sync([$location->id]);
 
     app(StockService::class)->receive([
         'product_id' => $product->id,
@@ -290,6 +297,7 @@ test('transfer moves stock between locations', function () {
     $product = makeProduct();
     $from = Location::factory()->create();
     $to = Location::factory()->create();
+    $keeper->locations()->sync([$from->id]);
 
     app(StockService::class)->receive([
         'product_id' => $product->id,
@@ -339,6 +347,7 @@ test('transfer exceeding stock shows insufficient stock error', function () {
     $product = makeProduct();
     $from = Location::factory()->create();
     $to = Location::factory()->create();
+    $keeper->locations()->sync([$from->id]);
 
     app(StockService::class)->receive([
         'product_id' => $product->id,
@@ -394,6 +403,7 @@ test('inventory index out-of-stock filter only shows zero-quantity rows', functi
     $withStock = Product::factory()->create(['base_unit_id' => $unit->id]);
     $noStock = Product::factory()->create(['base_unit_id' => $unit->id]);
     $location = Location::factory()->create();
+    $viewer->locations()->sync([$location->id]);
 
     app(StockService::class)->receive(['product_id' => $withStock->id, 'location_id' => $location->id, 'quantity' => '5.000']);
     StockLevel::query()->create([
@@ -467,6 +477,7 @@ test('ledger shows all movements in reverse chronological order', function () {
     $viewer = inventoryUser(['inventory.view']);
     $product = makeProduct();
     $location = Location::factory()->create();
+    $viewer->locations()->sync([$location->id]);
     $service = app(StockService::class);
 
     $service->receive(['product_id' => $product->id, 'location_id' => $location->id, 'quantity' => '10.000']);
@@ -482,6 +493,7 @@ test('ledger type filter restricts movements', function () {
     $viewer = inventoryUser(['inventory.view']);
     $product = makeProduct();
     $location = Location::factory()->create();
+    $viewer->locations()->sync([$location->id]);
     $service = app(StockService::class);
 
     $service->receive(['product_id' => $product->id, 'location_id' => $location->id, 'quantity' => '5.000']);
@@ -563,6 +575,7 @@ test('adjustment reason is stored in movement and visible in ledger', function (
     $keeper = inventoryUser(['inventory.view', 'inventory.adjust']);
     $product = makeProduct();
     $location = Location::factory()->create();
+    $keeper->locations()->sync([$location->id]);
 
     app(StockService::class)->receive(['product_id' => $product->id, 'location_id' => $location->id, 'quantity' => '10.000']);
 
@@ -581,6 +594,7 @@ test('adjustment reason is stored in movement and visible in ledger', function (
     expect($movement->reason)->toBe('Found damaged in storage');
 
     $viewer = inventoryUser(['inventory.view']);
+    $viewer->locations()->sync([$location->id]);
     Livewire::actingAs($viewer)->test(InventoryLedger::class)
         ->assertSee('Found damaged in storage');
 });
@@ -590,6 +604,7 @@ test('storekeeper can call receive adjust and transfer actions', function () {
     $product = makeProduct();
     $from = Location::factory()->create();
     $to = Location::factory()->create();
+    $keeper->locations()->sync([$from->id]);
 
     Livewire::actingAs($keeper)->test(InventoryIndex::class)
         ->call('openReceive', $product->id, (string) $from->id)

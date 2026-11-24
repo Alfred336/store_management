@@ -11,7 +11,9 @@ use App\Livewire\Actions\Users\ResetTwoFactor;
 use App\Livewire\Actions\Users\ResetUserPassword;
 use App\Livewire\Actions\Users\UpdateUser;
 use App\Models\AdminAuditLog;
+use App\Models\Location;
 use App\Models\User;
+use App\Services\Access\LocationAccess;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -80,6 +82,16 @@ class Index extends Component
     /** Edit-form toggle: only perform a reset when explicitly checked. */
     public bool $doResetPassword = false;
 
+    // ─── Location assignments ────────────────────────────────────────────────
+
+    /**
+     * Location IDs being assigned to the user.
+     * Empty array = no locations (blocked on save for non-Admin).
+     *
+     * @var int[]
+     */
+    public array $locationIds = [];
+
     // ─── Anonymize email confirmation ────────────────────────────────────────
 
     public string $confirmEmail = '';
@@ -143,6 +155,7 @@ class Index extends Component
         $this->name = $user->name;
         $this->email = $user->email;
         $this->roles = $user->roles->pluck('name')->all();
+        $this->locationIds = $user->locations()->pluck('location_id')->map(fn ($id) => (int) $id)->all();
         $this->showForm = true;
         $this->showDetails = false;
         $this->dispatch('modal-show', name: 'user-form');
@@ -169,6 +182,8 @@ class Index extends Component
             ['required', 'string', 'min:8', 'same:plainPasswordConfirmation', $defaultsRule]
         ));
 
+        $assigningAdmin = in_array('Admin', $this->roles, true);
+
         $data = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
@@ -179,6 +194,8 @@ class Index extends Component
             'plainPassword' => $this->passwordMode === 'manual' ? $manualPasswordRules : ['nullable'],
             'plainPasswordConfirmation' => $this->passwordMode === 'manual' ? ['required', 'string'] : ['nullable'],
             'emailPassword' => ['boolean'],
+            'locationIds' => $assigningAdmin ? ['nullable'] : ['required', 'array', 'min:1'],
+            'locationIds.*' => ['integer'],
         ]);
 
         $willEmail = $this->passwordMode === 'generate' || $this->emailPassword;
@@ -192,6 +209,7 @@ class Index extends Component
                 $this->passwordMode === 'manual' ? $this->plainPassword : null,
                 (bool) $data['mustChangePassword'],
                 $willEmail,
+                $assigningAdmin ? [] : array_map('intval', $this->locationIds),
             );
         } catch (\Throwable $e) {
             report($e);
@@ -216,11 +234,15 @@ class Index extends Component
         $this->name = trim($this->name);
         $this->email = strtolower(trim($this->email));
 
+        $assigningAdmin = in_array('Admin', $this->roles, true);
+
         $data = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
+            'locationIds' => $assigningAdmin ? ['nullable'] : ['required', 'array', 'min:1'],
+            'locationIds.*' => ['integer'],
         ]);
 
         if ($this->doResetPassword) {
@@ -240,7 +262,13 @@ class Index extends Component
             ]);
         }
 
-        $updateUser($user, $data['name'], $data['email'], $data['roles']);
+        $updateUser(
+            $user,
+            $data['name'],
+            $data['email'],
+            $data['roles'],
+            $assigningAdmin ? null : array_map('intval', $this->locationIds),
+        );
 
         if ($this->doResetPassword) {
             $willEmail = $this->passwordMode === 'generate' || $this->emailPassword;
@@ -417,7 +445,7 @@ class Index extends Component
         $recentAudit = [];
 
         if (($this->showDetails || $this->showDeleteConfirmation) && $this->userId !== null) {
-            $selectedUser = User::query()->with('roles')->find($this->userId);
+            $selectedUser = User::query()->with(['roles', 'locations'])->find($this->userId);
 
             if ($selectedUser !== null) {
                 $activityCounts = $this->getActivityCounts($selectedUser->id);
@@ -430,7 +458,10 @@ class Index extends Component
             }
         }
 
-        return view('livewire.users.index', compact('users', 'availableRoles', 'selectedUser', 'activityCounts', 'recentAudit'));
+        $activeLocations = Location::where('is_active', true)->orderBy('name')->get();
+        $actorAllowedLocationIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
+        return view('livewire.users.index', compact('users', 'availableRoles', 'selectedUser', 'activityCounts', 'recentAudit', 'activeLocations', 'actorAllowedLocationIds'));
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
@@ -447,6 +478,7 @@ class Index extends Component
         $this->mustChangePassword = true;
         $this->emailPassword = false;
         $this->doResetPassword = false;
+        $this->locationIds = [];
         $this->resetValidation();
     }
 

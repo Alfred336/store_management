@@ -209,6 +209,7 @@ test('full onboarding flow: change password then dashboard is accessible', funct
     app(EnsureSystemRoles::class)();
     $user = User::factory()->unverified()->create(['must_change_password' => true]);
     $user->assignRole('Cashier');
+    $user->locations()->sync([makeTestLocation()->id]);
     $this->actingAs($user);
 
     // Step 1: change the temporary password.
@@ -260,6 +261,7 @@ test('dashboard is accessible after changing password for unverified user', func
         'email_verified_at' => now(),
     ]);
     $user->assignRole('Cashier');
+    $user->locations()->sync([makeTestLocation()->id]);
     $this->actingAs($user);
 
     $this->get(route('dashboard'))->assertOk();
