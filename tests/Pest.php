@@ -3,6 +3,8 @@
 use App\Livewire\Actions\Customers\EnsureWalkInCustomer;
 use App\Models\Customer;
 use App\Models\Location;
+use App\Models\User;
+use App\Services\Access\LocationAccess;
 use App\Services\Setup\SetupStatus;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,4 +76,13 @@ function makeTestLocation(?string $name = null): Location
         'type' => 'store',
         'is_active' => true,
     ]);
+}
+
+/** Attach locations to a user (without removing existing ones) and flush the LocationAccess cache. */
+function grantLocation(User $user, Location ...$locations): User
+{
+    $user->locations()->attach(collect($locations)->pluck('id')->all());
+    app(LocationAccess::class)->flush($user->id);
+
+    return $user;
 }

@@ -86,6 +86,8 @@ function quotDocMakeSent(array $setup): Quotation
     app(Settings::class)->put('business.name', 'Test Company Ltd');
     app(Settings::class)->put('business.currency', 'TZS');
 
+    grantLocation(auth()->user(), $setup['location']);
+
     $draft = app(CreateQuotationDraft::class)([
         'customer_id' => $setup['customer']->id,
         'location_id' => $setup['location']->id,
@@ -160,6 +162,7 @@ test('draft quotation renders with DRAFT watermark in view', function () {
     $setup = quotDocSetup();
     $user = quotDocUser(['quotations.create', 'quotations.view', 'quotations.print']);
     $this->actingAs($user);
+    grantLocation($user, $setup['location']);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
     app(Settings::class)->put('tax.prices_include_tax', false);
@@ -192,6 +195,7 @@ test('expired quotation renders with EXPIRED watermark in view', function () {
     $setup = quotDocSetup();
     $user = quotDocUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.print']);
     $this->actingAs($user);
+    grantLocation($user, $setup['location']);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
     app(Settings::class)->put('tax.prices_include_tax', false);

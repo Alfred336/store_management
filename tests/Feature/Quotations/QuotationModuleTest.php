@@ -35,7 +35,7 @@ uses(RefreshDatabase::class);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function quotUser(array $permissions): User
+function quotUser(array $permissions, array $locationIds = []): User
 {
     $user = User::factory()->create(['name' => 'Quot Test User '.Str::random(4)]);
 
@@ -44,6 +44,10 @@ function quotUser(array $permissions): User
     }
 
     $user->givePermissionTo($permissions);
+
+    if (! empty($locationIds)) {
+        $user->locations()->sync($locationIds);
+    }
 
     return $user;
 }
@@ -138,7 +142,7 @@ function quotQuickSent(array $setup, ?string $unitPrice = null): Quotation
 
 test('draft quotation computes correct totals with base unit', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view']);
+    $user = quotUser(['quotations.create', 'quotations.view'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -177,7 +181,7 @@ test('draft quotation computes correct totals with base unit', function () {
 
 test('draft quotation converts packaging unit to base quantity correctly', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view']);
+    $user = quotUser(['quotations.create', 'quotations.view'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -210,7 +214,7 @@ test('draft quotation converts packaging unit to base quantity correctly', funct
 
 test('explicitly provided unit_price is kept on draft create and update', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.update', 'quotations.view']);
+    $user = quotUser(['quotations.create', 'quotations.update', 'quotations.view'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '0.00');
@@ -250,7 +254,7 @@ test('explicitly provided unit_price is kept on draft create and update', functi
 
 test('prospect-only quotation is allowed without a customer_id', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view']);
+    $user = quotUser(['quotations.create', 'quotations.view'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -282,7 +286,7 @@ test('prospect-only quotation is allowed without a customer_id', function () {
 
 test('draft creation fails if neither customer_id nor prospect_name is provided', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create']);
+    $user = quotUser(['quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     expect(fn () => app(CreateQuotationDraft::class)([
@@ -300,7 +304,7 @@ test('draft creation fails if neither customer_id nor prospect_name is provided'
 test('discount above max percent requires quotations.approve_discount permission', function () {
     $setup = quotSetup();
     // User with create but NOT approve_discount
-    $user = quotUser(['quotations.create', 'quotations.view']);
+    $user = quotUser(['quotations.create', 'quotations.view'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '0.00');
@@ -323,7 +327,7 @@ test('discount above max percent requires quotations.approve_discount permission
 
 test('discount above max percent succeeds with quotations.approve_discount permission', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.approve_discount']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.approve_discount'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '0.00');
@@ -349,7 +353,7 @@ test('discount above max percent succeeds with quotations.approve_discount permi
 
 test('send assigns a QUO-prefixed number and transitions to sent', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('numbering.quotation_prefix', 'QUO');
@@ -373,7 +377,7 @@ test('send assigns a QUO-prefixed number and transitions to sent', function () {
 
 test('send snapshots prospect details when no customer_id', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('quotations.validity_days', '14');
@@ -402,7 +406,7 @@ test('send snapshots prospect details when no customer_id', function () {
 test('a sent quotation cannot be updated', function () {
     $setup = quotSetup();
     // The policy denies update on non-draft quotations, so AuthorizationException is thrown.
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotQuickSent($setup);
@@ -417,7 +421,7 @@ test('a sent quotation cannot be updated', function () {
 test('a sent quotation cannot be deleted', function () {
     $setup = quotSetup();
     // The policy denies delete on non-draft quotations, so AuthorizationException is thrown.
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.delete']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.delete'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotQuickSent($setup);
@@ -434,7 +438,7 @@ test('no stock movement at any stage before an invoice is issued', function () {
     $user = quotUser([
         'quotations.create', 'quotations.view', 'quotations.send',
         'quotations.update', 'quotations.convert',
-    ]);
+    ], [$setup['location']->id]);
     $this->actingAs($user);
 
     $movementsBefore = StockMovement::query()->count();
@@ -463,7 +467,7 @@ test('no stock movement at any stage before an invoice is issued', function () {
 
 test('quotation with valid_until yesterday is treated as expired', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -494,7 +498,7 @@ test('quotation with valid_until yesterday is treated as expired', function () {
 
 test('accept is refused for an expired quotation', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -522,7 +526,7 @@ test('accept is refused for an expired quotation', function () {
 
 test('convert is refused for an expired quotation', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -552,7 +556,7 @@ test('convert is refused for an expired quotation', function () {
 
 test('accept transitions a sent quotation to accepted', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotQuickSent($setup);
@@ -564,7 +568,7 @@ test('accept transitions a sent quotation to accepted', function () {
 
 test('reject transitions a sent quotation to rejected and stores reason', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotQuickSent($setup);
@@ -579,7 +583,7 @@ test('reject transitions a sent quotation to rejected and stores reason', functi
 
 test('revise creates revision 2 and keeps the original revision 1 intact', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotQuickSent($setup);
@@ -602,7 +606,7 @@ test('revise creates revision 2 and keeps the original revision 1 intact', funct
 
 test('revise can be applied to a rejected quotation', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotQuickSent($setup);
@@ -615,7 +619,7 @@ test('revise can be applied to a rejected quotation', function () {
 
 test('revise can be applied to an expired quotation', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -646,7 +650,7 @@ test('revise can be applied to an expired quotation', function () {
 
 test('convert creates one invoice draft with the quoted prices and links both records', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -673,7 +677,7 @@ test('convert creates one invoice draft with the quoted prices and links both re
 
 test('a second convert on the same quotation is refused', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotQuickSent($setup);
@@ -689,7 +693,7 @@ test('a second convert on the same quotation is refused', function () {
 
 test('convert requires a registered customer for a prospect quotation', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -731,7 +735,7 @@ test('issuing the converted invoice deducts stock and runs the credit check', fu
     $user = quotUser([
         'quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert',
         'invoices.create', 'invoices.issue',
-    ]);
+    ], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -775,7 +779,7 @@ test('issuing the converted invoice fails when insufficient stock', function () 
     $user = quotUser([
         'quotations.create', 'quotations.view', 'quotations.send', 'quotations.convert',
         'invoices.create', 'invoices.issue',
-    ]);
+    ], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -792,7 +796,7 @@ test('issuing the converted invoice fails when insufficient stock', function () 
 
 test('draft quotation can be deleted and its items are removed', function () {
     $setup = quotSetup();
-    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.delete']);
+    $user = quotUser(['quotations.create', 'quotations.view', 'quotations.delete'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = quotQuickDraft($setup);
@@ -831,7 +835,7 @@ test('Storekeeper cannot send a quotation', function () {
     app(EnsureSystemRoles::class)();
 
     $setup = quotSetup();
-    $adminUser = quotUser(['quotations.create', 'quotations.view', 'quotations.send']);
+    $adminUser = quotUser(['quotations.create', 'quotations.view', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($adminUser);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -853,7 +857,7 @@ test('Viewer cannot convert a quotation', function () {
     app(EnsureSystemRoles::class)();
 
     $setup = quotSetup();
-    $adminUser = quotUser(['quotations.create', 'quotations.view', 'quotations.send']);
+    $adminUser = quotUser(['quotations.create', 'quotations.view', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($adminUser);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');

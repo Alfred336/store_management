@@ -4,6 +4,7 @@ namespace App\Livewire\Actions\Quotations;
 
 use App\Enums\QuotationStatus;
 use App\Models\Quotation;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Settings\Settings;
 use App\Services\StockService;
@@ -22,6 +23,7 @@ class CreateQuotationDraft
     public function __invoke(array $data): Quotation
     {
         Gate::authorize('create', Quotation::class);
+        app(LocationAccess::class)->ensure(auth()->user(), (int) $data['location_id']);
 
         return DB::transaction(function () use ($data): Quotation {
             $prepared = (new ValidateAndPrepareQuotationData(

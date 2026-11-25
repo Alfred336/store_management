@@ -67,7 +67,7 @@ class Index extends Component
 
     // ─── Password / reset form fields ────────────────────────────────────────
 
-    /** 'generate' | 'manual' */
+    /** @var 'generate'|'manual' */
     public string $passwordMode = 'generate';
 
     public string $plainPassword = '';
@@ -178,9 +178,7 @@ class Index extends Component
         $this->email = strtolower(trim($this->email));
 
         $defaultsRule = Password::defaults();
-        $manualPasswordRules = array_values(array_filter(
-            ['required', 'string', 'min:8', 'same:plainPasswordConfirmation', $defaultsRule]
-        ));
+        $manualPasswordRules = ['required', 'string', 'min:8', 'same:plainPasswordConfirmation', $defaultsRule];
 
         $assigningAdmin = in_array('Admin', $this->roles, true);
 
@@ -249,9 +247,7 @@ class Index extends Component
             abort_unless(auth()->user()?->can('users.reset_password'), 403);
 
             $defaultsRule = Password::defaults();
-            $manualPasswordRules = array_values(array_filter(
-                ['required', 'string', 'min:8', 'same:plainPasswordConfirmation', $defaultsRule]
-            ));
+            $manualPasswordRules = ['required', 'string', 'min:8', 'same:plainPasswordConfirmation', $defaultsRule];
 
             $this->validate([
                 'passwordMode' => ['required', Rule::in(['generate', 'manual'])],

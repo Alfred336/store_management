@@ -165,7 +165,10 @@ class Invoice extends Model
             && bccomp($this->balance(), '0', 2) > 0;
     }
 
-    /** @param Builder<Invoice> $query */
+    /**
+     * @param  Builder<Invoice>  $query
+     * @return Builder<Invoice>
+     */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         $ids = app(LocationAccess::class)->allowedLocationIds($user);

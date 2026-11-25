@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class LocationAccess
 {
-    /** Per-request cache: user_id => int[]|null */
+    /** @var array<int, list<int>|null> Per-request cache: user_id => allowed location ids, or null for Admin */
     private array $cache = [];
 
     /**
@@ -38,12 +38,13 @@ class LocationAccess
         }
 
         if (! isset($this->cache[$user->id])) {
-            $this->cache[$user->id] = $user->locations()
-                ->where('locations.is_active', true)
-                ->pluck('locations.id')
-                ->map(fn ($id) => (int) $id)
-                ->values()
-                ->all();
+            $this->cache[$user->id] = array_values(
+                $user->locations()
+                    ->where('locations.is_active', true)
+                    ->pluck('locations.id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all()
+            );
         }
 
         return $this->cache[$user->id];

@@ -11,6 +11,7 @@ use App\Models\InvoiceItem;
 use App\Models\InvoiceItemAllocation;
 use App\Models\Location;
 use App\Models\User;
+use App\Services\Access\LocationAccess;
 use App\Services\Customers\CreditLimitService;
 use App\Services\Invoicing\DocumentNumberingService;
 use App\Services\Invoicing\InvoiceCalculator;
@@ -40,6 +41,7 @@ class IssueInvoice
     public function __invoke(Invoice $invoice, string $idempotencyKey): IssueInvoiceResult
     {
         Gate::authorize('issue', $invoice);
+        app(LocationAccess::class)->ensure(auth()->user(), $invoice->location_id);
 
         if (trim($idempotencyKey) === '') {
             throw new InvalidArgumentException('An idempotency key is required to issue an invoice.');

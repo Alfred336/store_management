@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\InvoiceTemplate;
 use App\Models\Quotation;
+use App\Services\Access\LocationAccess;
 use App\Services\Quotations\QuotationDocumentData;
 use App\Services\Settings\Settings;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -26,6 +27,7 @@ class QuotationPdfController extends Controller
         QuotationDocumentData $documentData,
     ): Response {
         $this->authorize('print', $quotation);
+        app(LocationAccess::class)->ensure(auth()->user(), $quotation->location_id);
 
         $templateKey = (string) $settings->get('invoicing.quotation_template', InvoiceTemplate::default()->value);
         $template = InvoiceTemplate::tryFrom($templateKey) ?? InvoiceTemplate::default();

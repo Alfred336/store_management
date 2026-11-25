@@ -23,13 +23,17 @@ use Spatie\Permission\Models\Permission;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function screenUser(array $permissions): User
+function screenUser(array $permissions, array $locationIds = []): User
 {
     $user = User::factory()->create();
     foreach ($permissions as $perm) {
         Permission::findOrCreate($perm, 'web');
     }
     $user->givePermissionTo($permissions);
+
+    if (! empty($locationIds)) {
+        $user->locations()->sync($locationIds);
+    }
 
     return $user;
 }
@@ -100,7 +104,7 @@ function screenDraft(array $setup, ?int $qty = 5): Invoice
 
 test('invoice list renders for a user with invoices.view', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create']);
+    $user = screenUser(['invoices.view', 'invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = screenDraft($setup);
@@ -112,7 +116,7 @@ test('invoice list renders for a user with invoices.view', function () {
 
 test('search by number finds an issued invoice', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -127,7 +131,7 @@ test('search by number finds an issued invoice', function () {
 
 test('search by customer name filters the list', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create']);
+    $user = screenUser(['invoices.view', 'invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenDraft($setup);
@@ -139,7 +143,7 @@ test('search by customer name filters the list', function () {
 
 test('status filter shows only matching invoices', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -154,7 +158,7 @@ test('status filter shows only matching invoices', function () {
 
 test('overdue filter shows only past-due invoices with a balance', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -173,7 +177,7 @@ test('overdue filter shows only past-due invoices with a balance', function () {
 
 test('create a draft invoice from the screen', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create']);
+    $user = screenUser(['invoices.view', 'invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     Livewire::actingAs($user)->test(InvoicingIndex::class)
@@ -199,7 +203,7 @@ test('create a draft invoice from the screen', function () {
 
 test('edit a draft invoice from the screen', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.update']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = screenDraft($setup);
@@ -231,7 +235,7 @@ test('walk-in customer is not returned by the customer search', function () {
 test('walk-in customer is rejected when posted directly to store', function () {
     $setup = screenSetup();
     $walkIn = ensureWalkInCustomerForTests();
-    $user = screenUser(['invoices.view', 'invoices.create']);
+    $user = screenUser(['invoices.view', 'invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     Livewire::actingAs($user)->test(InvoicingIndex::class)
@@ -251,7 +255,7 @@ test('walk-in customer is rejected when posted directly to store', function () {
 
 test('issuing from the screen deducts stock', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -272,7 +276,7 @@ test('issuing from the screen deducts stock', function () {
 
 test('insufficient stock shows error message and invoice stays draft', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     // No stock received — issue will fail
@@ -292,7 +296,7 @@ test('insufficient stock shows error message and invoice stays draft', function 
 
 test('double submit with same idempotency key issues only once', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -316,7 +320,7 @@ test('double submit with same idempotency key issues only once', function () {
 
 test('credit warning is shown after issuing over limit', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     // Set credit limit that will be exceeded by the invoice total (qty=5 * 1000 = 5000)
@@ -343,7 +347,7 @@ test('credit warning is shown after issuing over limit', function () {
 
 test('void with a reason works from the screen', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue', 'invoices.void']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue', 'invoices.void'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -364,7 +368,7 @@ test('void with a reason works from the screen', function () {
 
 test('void without a reason fails and modal stays open', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue', 'invoices.void']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.issue', 'invoices.void'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -388,7 +392,7 @@ test('void without a reason fails and modal stays open', function () {
 
 test('draft can be deleted from the screen', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.update']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = screenDraft($setup);
@@ -407,7 +411,7 @@ test('draft can be deleted from the screen', function () {
 
 test('viewer cannot create, issue, void or delete via direct calls', function () {
     $setup = screenSetup();
-    $admin = screenUser(['invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue', 'invoices.void']);
+    $admin = screenUser(['invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue', 'invoices.void'], [$setup['location']->id]);
     $viewer = screenUser(['invoices.view']);
 
     // Setup as admin, then switch to viewer for assertions
@@ -444,7 +448,7 @@ test('viewer cannot create, issue, void or delete via direct calls', function ()
 
 test('cashier can issue but not void', function () {
     $setup = screenSetup();
-    $cashier = screenUser(['invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue']);
+    $cashier = screenUser(['invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($cashier);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -466,7 +470,7 @@ test('cashier can issue but not void', function () {
 
 test('only drafts can be edited or deleted via the screen', function () {
     $setup = screenSetup();
-    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue']);
+    $user = screenUser(['invoices.view', 'invoices.create', 'invoices.update', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     screenReceiveStock($setup['product'], $setup['location'], '50.000');

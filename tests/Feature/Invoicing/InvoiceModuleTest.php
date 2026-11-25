@@ -35,7 +35,7 @@ use Spatie\Permission\Models\Permission;
 
 uses(RefreshDatabase::class);
 
-function invoicingUser(array $permissions): User
+function invoicingUser(array $permissions, array $locationIds = []): User
 {
     $user = User::factory()->create(['name' => 'Invoice Test User']);
 
@@ -44,6 +44,10 @@ function invoicingUser(array $permissions): User
     }
 
     $user->givePermissionTo($permissions);
+
+    if (! empty($locationIds)) {
+        $user->locations()->sync($locationIds);
+    }
 
     return $user;
 }
@@ -116,7 +120,7 @@ function invoiceReceiveStock(Product $product, Location $location, string $quant
 
 test('draft invoice creation computes totals and base quantities including packaging unit', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.view']);
+    $user = invoicingUser(['invoices.create', 'invoices.view'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -171,7 +175,7 @@ test('draft invoice creation computes totals and base quantities including packa
 
 test('draft invoice validation fails with no items', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create']);
+    $user = invoicingUser(['invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     expect(fn () => app(CreateInvoiceDraft::class)([
@@ -184,7 +188,7 @@ test('draft invoice validation fails with no items', function () {
 test('draft invoice validation fails with bad unit not defined on product', function () {
     $setup = invoiceTestSetup();
     $unrelatedUnit = Unit::forceCreate(['name' => 'Litre', 'abbreviation' => 'L']);
-    $user = invoicingUser(['invoices.create']);
+    $user = invoicingUser(['invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     expect(fn () => app(CreateInvoiceDraft::class)([
@@ -203,7 +207,7 @@ test('draft invoice validation fails with bad unit not defined on product', func
 
 test('draft invoice validation fails with inactive product, customer, or location', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create']);
+    $user = invoicingUser(['invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $setup['product']->update(['is_active' => false]);
@@ -223,11 +227,12 @@ test('draft invoice validation fails with inactive product, customer, or locatio
 
     $setup['customer']->update(['is_active' => true]);
     $setup['location']->update(['is_active' => false]);
+    // An inactive location is blocked by LocationAccess (access denied) before data validation.
     expect(fn () => app(CreateInvoiceDraft::class)([
         'customer_id' => $setup['customer']->id,
         'location_id' => $setup['location']->id,
         'items' => [['product_id' => $setup['product']->id, 'quantity' => '1', 'unit_price' => '50.00']],
-    ]))->toThrow(ValidationException::class);
+    ]))->toThrow(AuthorizationException::class);
 });
 
 test('draft invoice validation fails with walk-in customer on channel invoice', function () {
@@ -239,7 +244,7 @@ test('draft invoice validation fails with walk-in customer on channel invoice', 
         'is_active' => true,
         'is_walk_in' => true,
     ]);
-    $user = invoicingUser(['invoices.create']);
+    $user = invoicingUser(['invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     expect(fn () => app(CreateInvoiceDraft::class)([
@@ -251,7 +256,7 @@ test('draft invoice validation fails with walk-in customer on channel invoice', 
 
 test('draft invoice validation fails when discount exceeds line subtotal', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create']);
+    $user = invoicingUser(['invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     expect(fn () => app(CreateInvoiceDraft::class)([
@@ -270,7 +275,7 @@ test('draft invoice validation fails when discount exceeds line subtotal', funct
 
 test('draft invoice validation fails when due date is before issue date', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create']);
+    $user = invoicingUser(['invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     expect(fn () => app(CreateInvoiceDraft::class)([
@@ -284,7 +289,7 @@ test('draft invoice validation fails when due date is before issue date', functi
 
 test('draft invoice can be updated while in draft status', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.update', 'invoices.view']);
+    $user = invoicingUser(['invoices.create', 'invoices.update', 'invoices.view'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = app(CreateInvoiceDraft::class)([
@@ -311,7 +316,7 @@ test('draft invoice can be updated while in draft status', function () {
 
 test('updating non-draft invoice is blocked', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.update']);
+    $user = invoicingUser(['invoices.create', 'invoices.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = app(CreateInvoiceDraft::class)([
@@ -331,7 +336,7 @@ test('updating non-draft invoice is blocked', function () {
 
 test('draft invoice can be deleted', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.update']);
+    $user = invoicingUser(['invoices.create', 'invoices.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = app(CreateInvoiceDraft::class)([
@@ -349,7 +354,7 @@ test('draft invoice can be deleted', function () {
 
 test('deleting non-draft invoice is blocked', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.update']);
+    $user = invoicingUser(['invoices.create', 'invoices.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = app(CreateInvoiceDraft::class)([
@@ -366,7 +371,7 @@ test('deleting non-draft invoice is blocked', function () {
 
 test('delete and update draft actions throw ValidationException for non-draft when policy bypassed', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.update']);
+    $user = invoicingUser(['invoices.create', 'invoices.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = app(CreateInvoiceDraft::class)([
@@ -394,7 +399,7 @@ test('delete and update draft actions throw ValidationException for non-draft wh
 
 test('issuing invoice deducts exact stock and records allocations that sum to base quantity', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -435,7 +440,7 @@ test('issuing invoice deducts exact stock and records allocations that sum to ba
 
 test('insufficient stock leaves everything unchanged without consuming number', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '5.000');
@@ -470,7 +475,7 @@ test('insufficient stock leaves everything unchanged without consuming number', 
 
 test('FEFO split across two batches produces two allocations in correct order', function () {
     $setup = invoiceTestSetup(trackBatches: true);
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $batchEarly = Batch::forceCreate([
@@ -520,7 +525,7 @@ test('FEFO split across two batches produces two allocations in correct order', 
 
 test('expired batch is not sold during invoice issuance', function () {
     $setup = invoiceTestSetup(trackBatches: true);
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $batchExpired = Batch::forceCreate([
@@ -552,7 +557,7 @@ test('expired batch is not sold during invoice issuance', function () {
 
 test('prices_include_tax both ways give the right totals', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '100.000');
@@ -587,7 +592,7 @@ test('prices_include_tax both ways give the right totals', function () {
 
 test('credit limit block stops invoice issuance when configured to block', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '100.000');
@@ -631,7 +636,7 @@ test('credit limit block stops invoice issuance when configured to block', funct
 
 test('same idempotency key returns the same invoice and does not post twice', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -658,7 +663,7 @@ test('same idempotency key returns the same invoice and does not post twice', fu
 
 test('idempotency replay returns same invoice even after status changed to paid', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '20.000');
@@ -688,7 +693,7 @@ test('idempotency replay returns same invoice even after status changed to paid'
 
 test('issuing an already issued invoice with different idempotency key fails', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -708,7 +713,7 @@ test('issuing an already issued invoice with different idempotency key fails', f
 test('user with invoices.issue but without customers.view can issue an invoice', function () {
     // Credit check must NOT go through GetCustomerStatement (which calls Gate::authorize('view', customer))
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']); // intentionally NO customers.view
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]); // intentionally NO customers.view
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '20.000');
@@ -726,7 +731,7 @@ test('user with invoices.issue but without customers.view can issue an invoice',
 
 test('walk-in customer is allowed on pos channel invoice', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $walkIn = Customer::forceCreate([
@@ -779,7 +784,7 @@ test('walk-in customer is allowed on pos channel invoice', function () {
 
 test('credit check at exactly the limit is allowed', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']); // no customers.view needed
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]); // no customers.view needed
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '100.000');
@@ -800,7 +805,7 @@ test('credit check at exactly the limit is allowed', function () {
 
 test('credit check one cent over the limit is blocked', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']); // no customers.view needed
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]); // no customers.view needed
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '100.000');
@@ -835,7 +840,7 @@ test('credit_limit of zero is treated as no limit by CreditLimitService', functi
 
 test('issuing a draft with an idempotency key already used by a different invoice throws ValidationException', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '50.000');
@@ -865,7 +870,7 @@ test('issuing a draft with an idempotency key already used by a different invoic
 
 test('document numbering is sequential and rolled back on failure', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '10.000');
@@ -905,7 +910,7 @@ test('document numbering is sequential and rolled back on failure', function () 
 
 test('voiding invoice returns exact quantities to exact batches with audit fields', function () {
     $setup = invoiceTestSetup(trackBatches: true);
-    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $batchA = Batch::forceCreate([
@@ -951,7 +956,7 @@ test('voiding invoice returns exact quantities to exact batches with audit field
 
 test('voiding invoice requires a non-empty reason', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '10.000');
@@ -968,7 +973,7 @@ test('voiding invoice requires a non-empty reason', function () {
 
 test('cannot void a draft invoice, an already void invoice, or an invoice with payments', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void'], [$setup['location']->id]);
     $this->actingAs($user);
 
     invoiceReceiveStock($setup['product'], $setup['location'], '10.000');
@@ -999,7 +1004,7 @@ test('cannot void a draft invoice, an already void invoice, or an invoice with p
 
 test('ledger invariant holds after issue and after void', function () {
     $setup = invoiceTestSetup(trackBatches: true);
-    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $batch = Batch::forceCreate([
@@ -1060,6 +1065,7 @@ test('cashier role can create and issue invoices but cannot void invoices', func
 
     $cashier = User::factory()->create(['name' => 'Cashier User']);
     $cashier->assignRole('Cashier');
+    grantLocation($cashier, $setup['location']);
     $this->actingAs($cashier);
 
     $draft = app(CreateInvoiceDraft::class)([
@@ -1082,7 +1088,7 @@ test('cashier role can create and issue invoices but cannot void invoices', func
 
 test('customer statement balance includes only issued, partially paid, and paid invoices, excluding drafts and voids', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void', 'customers.view']);
+    $user = invoicingUser(['invoices.create', 'invoices.issue', 'invoices.void', 'customers.view'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $location = $setup['location'];
@@ -1150,7 +1156,7 @@ test('customer statement balance includes only issued, partially paid, and paid 
 
 test('deleting a customer with invoices in any status is blocked', function () {
     $setup = invoiceTestSetup();
-    $user = invoicingUser(['customers.delete', 'invoices.create']);
+    $user = invoicingUser(['customers.delete', 'invoices.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     Invoice::forceCreate([

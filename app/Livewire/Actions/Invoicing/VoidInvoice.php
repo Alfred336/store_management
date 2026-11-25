@@ -5,6 +5,7 @@ namespace App\Livewire\Actions\Invoicing;
 use App\Enums\InvoiceStatus;
 use App\Livewire\Actions\Inventory\ReturnStock;
 use App\Models\Invoice;
+use App\Services\Access\LocationAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +19,7 @@ class VoidInvoice
     public function __invoke(Invoice $invoice, string $reason): Invoice
     {
         Gate::authorize('void', $invoice);
+        app(LocationAccess::class)->ensure(auth()->user(), $invoice->location_id);
 
         $trimmedReason = trim($reason);
         if ($trimmedReason === '') {

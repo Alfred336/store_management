@@ -4,6 +4,7 @@ namespace App\Livewire\Actions\Invoicing;
 
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Settings\Settings;
 use App\Services\StockService;
@@ -22,6 +23,7 @@ class CreateInvoiceDraft
     public function __invoke(array $data): Invoice
     {
         Gate::authorize('create', Invoice::class);
+        app(LocationAccess::class)->ensure(auth()->user(), (int) $data['location_id']);
 
         return DB::transaction(function () use ($data): Invoice {
             $prepared = (new ValidateAndPrepareInvoiceData(

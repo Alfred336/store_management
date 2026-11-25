@@ -91,7 +91,10 @@ class PosSession extends Model
         return $this->status === 'open';
     }
 
-    /** @param Builder<PosSession> $query */
+    /**
+     * @param  Builder<PosSession>  $query
+     * @return Builder<PosSession>
+     */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         $ids = app(LocationAccess::class)->allowedLocationIds($user);

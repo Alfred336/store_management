@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Location;
 use App\Models\Quotation;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Settings\Settings;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,7 @@ class ConvertQuotationToInvoice
     public function __invoke(Quotation $quotation, ?int $customerId = null): Invoice
     {
         Gate::authorize('convert', $quotation);
+        app(LocationAccess::class)->ensure(auth()->user(), $quotation->location_id);
 
         return DB::transaction(function () use ($quotation, $customerId): Invoice {
             // Lock the quotation row to prevent double-conversion.

@@ -4,6 +4,7 @@ namespace App\Livewire\Actions\Invoicing;
 
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Settings\Settings;
 use App\Services\StockService;
@@ -23,6 +24,11 @@ class UpdateInvoiceDraft
     public function __invoke(Invoice $invoice, array $data): Invoice
     {
         Gate::authorize('update', $invoice);
+        $access = app(LocationAccess::class);
+        $access->ensure(auth()->user(), $invoice->location_id);
+        if ((int) $data['location_id'] !== $invoice->location_id) {
+            $access->ensure(auth()->user(), (int) $data['location_id']);
+        }
 
         return DB::transaction(function () use ($invoice, $data): Invoice {
             $locked = Invoice::query()

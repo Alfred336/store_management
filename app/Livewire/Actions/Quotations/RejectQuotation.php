@@ -4,6 +4,7 @@ namespace App\Livewire\Actions\Quotations;
 
 use App\Enums\QuotationStatus;
 use App\Models\Quotation;
+use App\Services\Access\LocationAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -13,6 +14,7 @@ class RejectQuotation
     public function __invoke(Quotation $quotation, string $reason = ''): Quotation
     {
         Gate::authorize('reject', $quotation);
+        app(LocationAccess::class)->ensure(auth()->user(), $quotation->location_id);
 
         return DB::transaction(function () use ($quotation, $reason): Quotation {
             $locked = Quotation::query()

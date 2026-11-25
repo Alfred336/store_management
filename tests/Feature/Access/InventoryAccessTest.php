@@ -103,6 +103,39 @@ test('receive is blocked when target location is not in allowed set', function (
         ->assertStatus(403);
 });
 
+test('Admin role user with no location assignments can receive at any location', function (): void {
+    $locA = Location::factory()->create(['is_active' => true]);
+    $locB = Location::factory()->create(['is_active' => true]);
+    $product = invAccessProduct();
+
+    Permission::findOrCreate('inventory.receive', 'web');
+    Permission::findOrCreate('inventory.view', 'web');
+    $admin = User::factory()->create();
+    $admin->assignRole('Admin');
+    $admin->givePermissionTo(['inventory.view', 'inventory.receive']);
+    // Intentionally no location assignments
+
+    Livewire::actingAs($admin)->test(InventoryIndex::class)
+        ->call('openReceive', $product->id, (string) $locA->id)
+        ->set('receiveQuantity', '8.000')
+        ->call('receive')
+        ->assertHasNoErrors();
+
+    Livewire::actingAs($admin)->test(InventoryIndex::class)
+        ->call('openReceive', $product->id, (string) $locB->id)
+        ->set('receiveQuantity', '6.000')
+        ->call('receive')
+        ->assertHasNoErrors();
+
+    expect(
+        StockLevel::query()->where('product_id', $product->id)->where('location_id', $locA->id)->value('quantity')
+    )->toBe('8.000');
+
+    expect(
+        StockLevel::query()->where('product_id', $product->id)->where('location_id', $locB->id)->value('quantity')
+    )->toBe('6.000');
+});
+
 test('receive succeeds for location in allowed set', function (): void {
     $loc = Location::factory()->create(['is_active' => true]);
     $product = invAccessProduct();

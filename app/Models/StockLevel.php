@@ -38,7 +38,10 @@ class StockLevel extends Model
         return $this->belongsTo(Batch::class);
     }
 
-    /** @param Builder<StockLevel> $query */
+    /**
+     * @param  Builder<StockLevel>  $query
+     * @return Builder<StockLevel>
+     */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         $ids = app(LocationAccess::class)->allowedLocationIds($user);

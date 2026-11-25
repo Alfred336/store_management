@@ -64,6 +64,10 @@ function makePaymentInvoice(Customer $customer, string $total, string $amountPai
 
     $location = Location::forceCreate(['name' => 'WH-PAY-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT), 'type' => 'warehouse', 'is_active' => true]);
 
+    if (auth()->check()) {
+        grantLocation(auth()->user(), $location);
+    }
+
     return Invoice::forceCreate([
         'customer_id' => $customer->id,
         'location_id' => $location->id,

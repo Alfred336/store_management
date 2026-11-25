@@ -4,6 +4,7 @@ namespace App\Livewire\Actions\Quotations;
 
 use App\Enums\QuotationStatus;
 use App\Models\Quotation;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\DocumentNumberingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -24,6 +25,7 @@ class SendQuotation
     public function __invoke(Quotation $quotation): Quotation
     {
         Gate::authorize('send', $quotation);
+        app(LocationAccess::class)->ensure(auth()->user(), $quotation->location_id);
 
         return DB::transaction(function () use ($quotation): Quotation {
             $locked = Quotation::query()

@@ -129,6 +129,7 @@ function namedCustomer(string $creditLimit = '0.00'): Customer
 test('cashier_can_open_a_pos_session', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
 
     $this->actingAs($user);
 
@@ -148,6 +149,7 @@ test('cashier_can_open_a_pos_session', function (): void {
 test('opening_a_second_session_is_blocked', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
 
     $this->actingAs($user);
 
@@ -164,6 +166,7 @@ test('opening_a_second_session_is_blocked', function (): void {
 test('closing_a_session_computes_expected_cash_and_difference', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -198,6 +201,7 @@ test('user_with_close_any_session_can_force_close_another_users_session', functi
     $cashier = posUser();
     $manager = posAdminUser();
     $location = posLocation();
+    grantLocation($manager, $location);
 
     $session = posSession($cashier, $location);
 
@@ -215,6 +219,7 @@ test('user_with_close_any_session_can_force_close_another_users_session', functi
 test('completing_a_pos_sale_issues_a_receipt_numbered_invoice', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -237,6 +242,7 @@ test('completing_a_pos_sale_issues_a_receipt_numbered_invoice', function (): voi
 test('pos_sale_uses_selling_price_as_default_unit_price', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -258,6 +264,7 @@ test('pos_sale_uses_selling_price_as_default_unit_price', function (): void {
 test('pos_payment_records_amount_tendered_and_change_given', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -283,6 +290,7 @@ test('pos_payment_records_amount_tendered_and_change_given', function (): void {
 test('multiple_tenders_are_aggregated_correctly', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -310,6 +318,7 @@ test('multiple_tenders_are_aggregated_correctly', function (): void {
 test('credit_sale_needs_pos_credit_sale_permission', function (): void {
     $user = posUser(); // no pos.credit_sale
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -330,6 +339,7 @@ test('credit_sale_needs_pos_credit_sale_permission', function (): void {
 test('credit_sale_is_blocked_when_customer_limit_exceeded', function (): void {
     $user = posAdminUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -350,6 +360,7 @@ test('credit_sale_is_blocked_when_customer_limit_exceeded', function (): void {
 test('insufficient_stock_throws_exception', function (): void {
     $user = posUser();
     $location = posLocation();
+    $user->locations()->attach($location->id);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -369,6 +380,7 @@ test('insufficient_stock_throws_exception', function (): void {
 test('walk_in_customer_cannot_take_a_credit_sale', function (): void {
     $user = posAdminUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -388,6 +400,7 @@ test('walk_in_customer_cannot_take_a_credit_sale', function (): void {
 test('hold_sale_does_not_affect_stock_or_numbering', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -416,6 +429,7 @@ test('hold_sale_does_not_affect_stock_or_numbering', function (): void {
 test('resume_sale_restores_cart_and_deletes_held_sale', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -442,6 +456,7 @@ test('resume_sale_restores_cart_and_deletes_held_sale', function (): void {
 test('void_held_sale_deletes_the_record', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -496,6 +511,7 @@ test('close_session_requires_at_least_one_permission', function (): void {
 test('tampered_unit_price_is_ignored_server_uses_db_selling_price', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -519,6 +535,7 @@ test('tampered_unit_price_is_ignored_server_uses_db_selling_price', function ():
 test('discount_without_pos_discount_permission_is_rejected', function (): void {
     $user = posUser(); // no pos.discount
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -538,6 +555,7 @@ test('discount_without_pos_discount_permission_is_rejected', function (): void {
 test('discount_above_max_discount_percent_is_rejected', function (): void {
     $user = posUser(['pos.discount']);
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     // 7.5% limit: selling_price=100, qty=1 → line=100, max=7.50
@@ -562,6 +580,7 @@ test('discount_above_max_discount_percent_is_rejected', function (): void {
 test('discount_within_max_discount_percent_is_accepted', function (): void {
     $user = posUser(['pos.discount']);
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     // 7.5% limit: 7.50 <= 7.50 → accepted
@@ -612,7 +631,6 @@ test('storekeeper_cannot_complete_a_sale', function (): void {
     $storekeeper = User::factory()->create();
     Permission::findOrCreate('inventory.view', 'web');
     $storekeeper->givePermissionTo('inventory.view');
-    $location = posLocation();
 
     $this->actingAs($storekeeper);
 
@@ -630,6 +648,7 @@ test('storekeeper_cannot_complete_a_sale', function (): void {
 test('thermal_receipt_renders_a_pdf', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -658,6 +677,7 @@ test('thermal_receipt_renders_a_pdf', function (): void {
 test('product_search_is_empty_after_adding_item_to_cart', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $product = posProduct($location);
     posSession($user, $location);
 
@@ -673,6 +693,7 @@ test('product_search_is_empty_after_adding_item_to_cart', function (): void {
 test('carton_line_uses_selling_price_times_factor_and_ignores_tampered_price', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -717,6 +738,7 @@ test('carton_line_uses_selling_price_times_factor_and_ignores_tampered_price', f
 test('voiding_a_pos_invoice_is_blocked_while_payments_exist', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     $session = posSession($user, $location);
@@ -808,6 +830,7 @@ test('thermal_receipt_with_many_allocations_renders_a_pdf', function (): void {
 test('pos_screen_insufficient_stock_shows_error_no_invoice_saved', function (): void {
     $user = posUser();
     $location = posLocation();
+    $user->locations()->attach($location->id);
     $this->actingAs($user);
 
     posSession($user, $location);
@@ -856,6 +879,7 @@ test('pos_screen_insufficient_stock_shows_error_no_invoice_saved', function (): 
 test('pos_screen_idempotency_key_unchanged_after_stock_failure', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     posSession($user, $location);
@@ -889,6 +913,7 @@ test('pos_screen_idempotency_key_unchanged_after_stock_failure', function (): vo
 test('pos_screen_zero_stock_product_not_added_to_cart', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     posSession($user, $location);
@@ -904,6 +929,7 @@ test('pos_screen_zero_stock_product_not_added_to_cart', function (): void {
 test('pos_screen_product_with_stock_is_added_to_cart', function (): void {
     $user = posUser();
     $location = posLocation();
+    grantLocation($user, $location);
     $this->actingAs($user);
 
     posSession($user, $location);
@@ -922,6 +948,7 @@ test('pos_screen_product_with_stock_is_added_to_cart', function (): void {
 test('pos_screen_partial_stock_error_no_invoice_saved', function (): void {
     $user = posUser();
     $location = posLocation();
+    $user->locations()->attach($location->id);
     $this->actingAs($user);
 
     posSession($user, $location);

@@ -168,7 +168,10 @@ class Quotation extends Model
         return $this->customer->name ?? $this->prospect_name ?? '—';
     }
 
-    /** @param Builder<Quotation> $query */
+    /**
+     * @param  Builder<Quotation>  $query
+     * @return Builder<Quotation>
+     */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         $ids = app(LocationAccess::class)->allowedLocationIds($user);

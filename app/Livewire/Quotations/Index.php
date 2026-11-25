@@ -14,10 +14,10 @@ use App\Livewire\Actions\Quotations\SendQuotation;
 use App\Livewire\Actions\Quotations\UpdateQuotationDraft;
 use App\Mail\QuotationMail;
 use App\Models\Customer;
-use App\Models\Location;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\StockLevel;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Quotations\QuotationDocumentData;
 use App\Services\Settings\Settings;
@@ -209,6 +209,7 @@ class Index extends Component
         } else {
             $quotation = Quotation::query()->findOrFail($id);
             $this->authorize('update', $quotation);
+            abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $quotation->location_id), 403);
             $this->quotationId = $quotation->id;
 
             // Recipient mode
@@ -343,6 +344,7 @@ class Index extends Component
     {
         $quotation = Quotation::query()->findOrFail($id);
         $this->authorize('view', $quotation);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $quotation->location_id), 403);
         $this->quotationId = $quotation->id;
         $this->showDetails = true;
         $this->showForm = false;
@@ -362,6 +364,7 @@ class Index extends Component
     {
         $quotation = Quotation::query()->findOrFail($id);
         $this->authorize('delete', $quotation);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $quotation->location_id), 403);
         $this->quotationId = $quotation->id;
         $this->showDeleteConfirmation = true;
         $this->dispatch('modal-show', name: 'quotation-delete');
@@ -389,6 +392,7 @@ class Index extends Component
     {
         $quotation = Quotation::query()->findOrFail($id);
         $this->authorize('send', $quotation);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $quotation->location_id), 403);
         $this->quotationId = $quotation->id;
         $this->showSendConfirmation = true;
         $this->dispatch('modal-show', name: 'quotation-send');
@@ -426,6 +430,7 @@ class Index extends Component
         } else {
             $this->authorize('reject', $quotation);
         }
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $quotation->location_id), 403);
 
         $this->quotationId = $quotation->id;
         $this->statusAction = $action;
@@ -475,6 +480,7 @@ class Index extends Component
     {
         $quotation = Quotation::query()->findOrFail($id);
         $this->authorize('revise', $quotation);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $quotation->location_id), 403);
 
         try {
             $newDraft = $revise($quotation);
@@ -490,6 +496,7 @@ class Index extends Component
     {
         $quotation = Quotation::query()->findOrFail($id);
         $this->authorize('convert', $quotation);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $quotation->location_id), 403);
         $this->quotationId = $quotation->id;
         $this->convertCustomerId = $quotation->customer_id;
         $this->convertCustomerName = $quotation->customer->name ?? '';
@@ -544,6 +551,7 @@ class Index extends Component
     {
         $quotation = Quotation::query()->findOrFail($id);
         $this->authorize('print', $quotation);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $quotation->location_id), 403);
         $this->quotationId = $quotation->id;
         $this->emailError = null;
 
@@ -552,7 +560,6 @@ class Index extends Component
             ?? $quotation->prospect_email
             ?? '';
         $this->emailMessage = '';
-        $this->emailTemplate = 'classic';
         $this->showEmailPanel = true;
         $this->dispatch('modal-show', name: 'quotation-email');
     }
@@ -632,6 +639,7 @@ class Index extends Component
         $today = now()->toDateString();
 
         $quotations = Quotation::query()
+            ->visibleTo(auth()->user())
             ->with(['customer:id,name,code', 'location:id,name'])
             ->when($this->search !== '', function (Builder $query): void {
                 $term = '%'.$this->search.'%';
@@ -656,7 +664,7 @@ class Index extends Component
             ->orderBy($sortBy, $sortDir)
             ->paginate(20);
 
-        $locations = Location::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $locations = app(LocationAccess::class)->allowedLocations(auth()->user());
 
         // Compute live totals for the form.
         $liveTotals = null;

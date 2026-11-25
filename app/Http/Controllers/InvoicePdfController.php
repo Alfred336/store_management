@@ -6,6 +6,7 @@ use App\Enums\InvoiceTemplate;
 use App\Livewire\Actions\Invoicing\RenderInvoiceDocument;
 use App\Models\Invoice;
 use App\Models\InvoiceDocument;
+use App\Services\Access\LocationAccess;
 use App\Services\Settings\Settings;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +27,7 @@ class InvoicePdfController extends Controller
     public function render(Invoice $invoice, Settings $settings, RenderInvoiceDocument $renderInvoiceDocument): Response
     {
         $this->authorize('print', $invoice);
+        app(LocationAccess::class)->ensure(auth()->user(), $invoice->location_id);
 
         // Determine template and paper from settings; POS channel is always thermal.
         if ($invoice->channel === 'pos') {
@@ -68,6 +70,7 @@ class InvoicePdfController extends Controller
     public function download(Invoice $invoice, InvoiceDocument $document): StreamedResponse
     {
         $this->authorize('print', $invoice);
+        app(LocationAccess::class)->ensure(auth()->user(), $invoice->location_id);
 
         abort_if($document->invoice_id !== $invoice->id, 404);
         abort_if($document->path === null, 404);

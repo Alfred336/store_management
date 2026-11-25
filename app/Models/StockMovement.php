@@ -55,7 +55,10 @@ class StockMovement extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** @param Builder<StockMovement> $query */
+    /**
+     * @param  Builder<StockMovement>  $query
+     * @return Builder<StockMovement>
+     */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         $ids = app(LocationAccess::class)->allowedLocationIds($user);

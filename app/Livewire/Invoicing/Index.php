@@ -13,6 +13,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceDocument;
 use App\Models\Location;
 use App\Models\Product;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\InvoiceCalculator;
 use Carbon\Carbon;
 use Flux\Flux;
@@ -183,6 +184,7 @@ class Index extends Component
         } else {
             $invoice = Invoice::query()->findOrFail($id);
             $this->authorize('update', $invoice);
+            abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $invoice->location_id), 403);
             $this->invoiceId = $invoice->id;
             $this->selectedCustomerId = $invoice->customer_id;
             $this->selectedCustomerName = $invoice->customer->name ?? '';
@@ -325,6 +327,7 @@ class Index extends Component
     {
         $invoice = Invoice::query()->findOrFail($id);
         $this->authorize('view', $invoice);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $invoice->location_id), 403);
         $this->invoiceId = $invoice->id;
         $this->showDetails = true;
         $this->showForm = false;
@@ -344,6 +347,7 @@ class Index extends Component
     {
         $invoice = Invoice::query()->findOrFail($id);
         $this->authorize('delete', $invoice);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $invoice->location_id), 403);
         $this->invoiceId = $invoice->id;
         $this->showDeleteConfirmation = true;
         $this->dispatch('modal-show', name: 'invoice-delete');
@@ -371,6 +375,7 @@ class Index extends Component
     {
         $invoice = Invoice::query()->findOrFail($id);
         $this->authorize('issue', $invoice);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $invoice->location_id), 403);
         $this->invoiceId = $invoice->id;
         $this->idempotencyKey = Str::uuid()->toString();
         $this->issueError = null;
@@ -428,6 +433,7 @@ class Index extends Component
     {
         $invoice = Invoice::query()->findOrFail($id);
         $this->authorize('void', $invoice);
+        abort_unless(app(LocationAccess::class)->canAccess(auth()->user(), $invoice->location_id), 403);
         $this->invoiceId = $invoice->id;
         $this->voidReason = '';
         $this->voidError = null;
@@ -470,6 +476,7 @@ class Index extends Component
         $sortDir = in_array($this->sortDirection, ['asc', 'desc'], true) ? $this->sortDirection : 'desc';
 
         $invoices = Invoice::query()
+            ->visibleTo(auth()->user())
             ->where('channel', 'invoice')
             ->with(['customer:id,name,code', 'location:id,name'])
             ->when($this->search !== '', function (Builder $query): void {
@@ -569,8 +576,8 @@ class Index extends Component
             }
         }
 
-        // Active locations for the form location picker
-        $locations = Location::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        // Active locations scoped to what this user may access
+        $locations = app(LocationAccess::class)->allowedLocations(auth()->user());
 
         // Invoice details (eager-loaded only when details panel is open)
         $selectedInvoice = null;

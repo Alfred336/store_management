@@ -19,7 +19,7 @@ uses(RefreshDatabase::class);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function quotScrUser(array $permissions): User
+function quotScrUser(array $permissions, array $locationIds = []): User
 {
     $user = User::factory()->create(['name' => 'QuotScr User '.Str::random(4)]);
 
@@ -28,6 +28,10 @@ function quotScrUser(array $permissions): User
     }
 
     $user->givePermissionTo($permissions);
+
+    if (! empty($locationIds)) {
+        $user->locations()->sync($locationIds);
+    }
 
     return $user;
 }
@@ -103,7 +107,7 @@ function quotScrSent(array $setup): Quotation
 
 test('quotation list renders for a user with quotations.view', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create']);
+    $user = quotScrUser(['quotations.view', 'quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = quotScrDraft($setup);
@@ -124,7 +128,7 @@ test('quotation list page is denied without quotations.view', function () {
 
 test('search filters the quotation list by customer name', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create']);
+    $user = quotScrUser(['quotations.view', 'quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     quotScrDraft($setup);
@@ -136,7 +140,7 @@ test('search filters the quotation list by customer name', function () {
 
 test('status filter to sent hides draft quotations', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create']);
+    $user = quotScrUser(['quotations.view', 'quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     quotScrDraft($setup);  // draft only
@@ -148,7 +152,7 @@ test('status filter to sent hides draft quotations', function () {
 
 test('status filter to draft shows only draft quotations', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = quotScrDraft($setup);
@@ -163,7 +167,7 @@ test('status filter to draft shows only draft quotations', function () {
 
 test('openForm dispatches modal-show event with name quotation-form', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create']);
+    $user = quotScrUser(['quotations.view', 'quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     Livewire::actingAs($user)->test(QuotationsIndex::class)
@@ -173,7 +177,7 @@ test('openForm dispatches modal-show event with name quotation-form', function (
 
 test('closeForm dispatches modal-close event', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create']);
+    $user = quotScrUser(['quotations.view', 'quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     Livewire::actingAs($user)->test(QuotationsIndex::class)
@@ -184,7 +188,7 @@ test('closeForm dispatches modal-close event', function () {
 
 test('show dispatches modal-show event with name quotation-details', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create']);
+    $user = quotScrUser(['quotations.view', 'quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = quotScrDraft($setup);
@@ -196,7 +200,7 @@ test('show dispatches modal-show event with name quotation-details', function ()
 
 test('confirmDelete dispatches modal-show event for delete confirmation', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.delete']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.delete'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = quotScrDraft($setup);
@@ -208,7 +212,7 @@ test('confirmDelete dispatches modal-show event for delete confirmation', functi
 
 test('openSendConfirmation dispatches modal-show event for send confirmation', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = quotScrDraft($setup);
@@ -220,7 +224,7 @@ test('openSendConfirmation dispatches modal-show event for send confirmation', f
 
 test('openEmailPanel dispatches modal-show event for email panel', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.print']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.print'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotScrSent($setup);
@@ -232,7 +236,7 @@ test('openEmailPanel dispatches modal-show event for email panel', function () {
 
 test('openConvertPanel dispatches modal-show event for convert panel', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.convert']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.convert'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotScrSent($setup);
@@ -246,7 +250,7 @@ test('openConvertPanel dispatches modal-show event for convert panel', function 
 
 test('store creates a draft quotation and shows a success toast', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create']);
+    $user = quotScrUser(['quotations.view', 'quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('tax.vat_rate', '18.00');
@@ -279,7 +283,7 @@ test('store creates a draft quotation and shows a success toast', function () {
 
 test('store shows validation errors when items array is empty', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create']);
+    $user = quotScrUser(['quotations.view', 'quotations.create'], [$setup['location']->id]);
     $this->actingAs($user);
 
     Livewire::actingAs($user)->test(QuotationsIndex::class)
@@ -295,7 +299,7 @@ test('store shows validation errors when items array is empty', function () {
 
 test('deleteDraft removes the quotation and closes the confirmation modal', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.delete']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.delete'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $draft = quotScrDraft($setup);
@@ -312,7 +316,7 @@ test('deleteDraft removes the quotation and closes the confirmation modal', func
 
 test('sendQuotation transitions the draft to sent and closes modal', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     app(Settings::class)->put('numbering.quotation_prefix', 'QUO');
@@ -334,7 +338,7 @@ test('sendQuotation transitions the draft to sent and closes modal', function ()
 
 test('applyStatus with accept transitions the quotation to accepted', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.update']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotScrSent($setup);
@@ -349,7 +353,7 @@ test('applyStatus with accept transitions the quotation to accepted', function (
 
 test('applyStatus with reject stores the reason', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.update']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.update'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotScrSent($setup);
@@ -369,7 +373,7 @@ test('applyStatus with reject stores the reason', function () {
 
 test('revise creates a new draft and closes details panel', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotScrSent($setup);
@@ -386,7 +390,7 @@ test('revise creates a new draft and closes details panel', function () {
 
 test('convert creates an invoice draft from a registered-customer quotation', function () {
     $setup = quotScrSetup();
-    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.convert']);
+    $user = quotScrUser(['quotations.view', 'quotations.create', 'quotations.send', 'quotations.convert'], [$setup['location']->id]);
     $this->actingAs($user);
 
     $sent = quotScrSent($setup);

@@ -64,6 +64,8 @@ function makeIssuedInvoice(string $idempotencyKey = 'IDEMP-DOC-TEST'): Invoice
         'is_active' => true,
     ]);
 
+    grantLocation(auth()->user(), $location);
+
     $customer = Customer::forceCreate([
         'code' => 'CUS-'.Str::upper(Str::random(6)),
         'name' => 'Bright Traders Ltd',
@@ -244,6 +246,7 @@ test('draft invoice renders with DRAFT watermark and is not persisted in invoice
         'tax_type' => 'standard', 'reorder_level' => 0, 'track_batches' => false, 'is_active' => true,
     ]);
     $location = Location::forceCreate(['name' => 'WH '.Str::random(6), 'type' => 'warehouse', 'is_active' => true]);
+    grantLocation(auth()->user(), $location);
     $customer = Customer::forceCreate([
         'code' => 'CUS-'.Str::upper(Str::random(6)), 'name' => 'Draft Customer',
         'type' => 'individual', 'is_active' => true, 'is_walk_in' => false,
@@ -430,6 +433,7 @@ test('logo is embedded as base64 data-url when the file exists at the configured
         'tax_type' => 'standard', 'reorder_level' => 0, 'track_batches' => false, 'is_active' => true,
     ]);
     $location = Location::forceCreate(['name' => 'WH '.Str::random(6), 'type' => 'warehouse', 'is_active' => true]);
+    grantLocation(auth()->user(), $location);
     $customer = Customer::forceCreate([
         'code' => 'CUS-'.Str::upper(Str::random(6)), 'name' => 'Logo Co',
         'type' => 'individual', 'is_active' => true, 'is_walk_in' => false,
@@ -460,6 +464,7 @@ test('logo is null when the path is not configured', function () {
         'tax_type' => 'standard', 'reorder_level' => 0, 'track_batches' => false, 'is_active' => true,
     ]);
     $location = Location::forceCreate(['name' => 'WH '.Str::random(6), 'type' => 'warehouse', 'is_active' => true]);
+    grantLocation(auth()->user(), $location);
     $customer = Customer::forceCreate([
         'code' => 'CUS-'.Str::upper(Str::random(6)), 'name' => 'No Logo Co',
         'type' => 'individual', 'is_active' => true, 'is_walk_in' => false,

@@ -4,6 +4,7 @@ namespace App\Livewire\Actions\Quotations;
 
 use App\Enums\QuotationStatus;
 use App\Models\Quotation;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Settings\Settings;
 use App\Services\StockService;
@@ -23,6 +24,11 @@ class UpdateQuotationDraft
     public function __invoke(Quotation $quotation, array $data): Quotation
     {
         Gate::authorize('update', $quotation);
+        $access = app(LocationAccess::class);
+        $access->ensure(auth()->user(), $quotation->location_id);
+        if ((int) $data['location_id'] !== $quotation->location_id) {
+            $access->ensure(auth()->user(), (int) $data['location_id']);
+        }
 
         return DB::transaction(function () use ($quotation, $data): Quotation {
             $locked = Quotation::query()

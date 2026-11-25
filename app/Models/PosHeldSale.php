@@ -62,7 +62,10 @@ class PosHeldSale extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    /** @param Builder<PosHeldSale> $query */
+    /**
+     * @param  Builder<PosHeldSale>  $query
+     * @return Builder<PosHeldSale>
+     */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         $ids = app(LocationAccess::class)->allowedLocationIds($user);

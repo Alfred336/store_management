@@ -120,7 +120,7 @@ class UpdateUser
                 ->exists();
 
             if ($hasOpen) {
-                $locName = Location::find($lid)?->name ?? "#{$lid}";
+                $locName = Location::find($lid)->name ?? "#{$lid}";
                 throw ValidationException::withMessages([
                     'locations' => "Cannot remove {$locName}: the user has an open POS session there.",
                 ]);
