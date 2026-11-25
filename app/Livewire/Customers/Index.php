@@ -282,7 +282,7 @@ class Index extends Component
 
         if ($selectedCustomer !== null) {
             $this->authorize('view', $selectedCustomer);
-            $statement = $getCustomerStatement($selectedCustomer);
+            $statement = $getCustomerStatement($selectedCustomer, 10, auth()->user());
         }
 
         return view('livewire.customers.index', compact('customers', 'selectedCustomer', 'statement'));

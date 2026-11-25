@@ -150,6 +150,7 @@ test('customer statement reads outstanding invoice balances and recent payment h
     $payment = Payment::forceCreate([
         'number' => 'PAY-2026-000001',
         'customer_id' => $customer->id,
+        'location_id' => $location->id,
         'method' => 'cash',
         'amount' => '25.50',
         'reference' => 'PMT-001',
@@ -167,6 +168,7 @@ test('customer statement reads outstanding invoice balances and recent payment h
     ]);
 
     $user = customerPermissionsUser(['customers.view']);
+    grantLocation($user, $location);
     Livewire::actingAs($user)->test(CustomersIndex::class)
         ->call('show', $customer->id)
         ->assertSee('100.00')

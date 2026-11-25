@@ -6,6 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Services\Access\LocationAccess;
 use App\Services\Money\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -49,6 +50,11 @@ class AllocateCredit
                 throw ValidationException::withMessages(['payment' => 'Only active payments can be allocated.']);
             }
 
+            // Location access: ensure user may touch this payment
+            if ($locked->location_id !== null) {
+                app(LocationAccess::class)->ensure(auth()->user(), $locked->location_id);
+            }
+
             $available = $locked->unallocatedCredit();
 
             // Lock invoice rows in ascending id order
@@ -67,6 +73,11 @@ class AllocateCredit
                 ->get()
                 ->keyBy('id')
                 ->all();
+
+            // Location access: ensure user may access each invoice's location
+            foreach ($invoices as $inv) {
+                app(LocationAccess::class)->ensure(auth()->user(), $inv->location_id);
+            }
 
             $allocationTotal = '0.00';
 

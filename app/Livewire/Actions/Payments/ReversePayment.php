@@ -5,6 +5,7 @@ namespace App\Livewire\Actions\Payments;
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Services\Access\LocationAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -32,6 +33,11 @@ class ReversePayment
 
             if ($locked->status === 'reversed') {
                 throw ValidationException::withMessages(['payment' => 'This payment has already been reversed.']);
+            }
+
+            // Location access: ensure user may touch this payment
+            if ($locked->location_id !== null) {
+                app(LocationAccess::class)->ensure(auth()->user(), $locked->location_id);
             }
 
             // Load allocations

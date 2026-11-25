@@ -14,7 +14,7 @@ class CustomerStatementController
     public function __invoke(Customer $customer, GetCustomerStatement $getCustomerStatement): Response
     {
         Gate::authorize('view', $customer);
-        $statement = $getCustomerStatement($customer, null);
+        $statement = $getCustomerStatement($customer, null, auth()->user());
 
         return Pdf::loadView('pdf.customers.statement', compact('customer', 'statement'))
             ->setPaper('a4')

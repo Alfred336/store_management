@@ -7,6 +7,7 @@ use App\Livewire\Actions\Payments\ReversePayment;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Services\Access\LocationAccess;
 use App\Services\Money\Money;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -174,7 +175,7 @@ class Index extends Component
 
         if ($invoiceId !== null) {
             $invoice = Invoice::query()->with('customer')->find($invoiceId);
-            if ($invoice && $invoice->customer) {
+            if ($invoice && $invoice->customer && app(LocationAccess::class)->canAccess(auth()->user(), $invoice->location_id)) {
                 $this->contextInvoiceId = $invoiceId;
                 $this->formCustomerId = $invoice->customer_id;
                 $this->formCustomerName = $invoice->customer->name;
@@ -274,6 +275,14 @@ class Index extends Component
     {
         $payment = Payment::query()->findOrFail($id);
         $this->authorize('view', $payment);
+
+        $access = app(LocationAccess::class);
+        if ($payment->location_id !== null) {
+            $access->ensure(auth()->user(), $payment->location_id);
+        } else {
+            abort_unless($access->allowedLocationIds(auth()->user()) === null, 403);
+        }
+
         $this->paymentId = $payment->id;
         $this->reverseReason = '';
         $this->reverseError = null;
@@ -325,6 +334,7 @@ class Index extends Component
         $sortDir = in_array($this->sortDirection, ['asc', 'desc'], true) ? $this->sortDirection : 'desc';
 
         $payments = Payment::query()
+            ->visibleTo(auth()->user())
             ->with(['customer:id,name,code', 'receiver:id,name'])
             ->when($this->search !== '', function (Builder $q): void {
                 $term = '%'.$this->search.'%';
@@ -344,6 +354,7 @@ class Index extends Component
 
         // Filtered totals
         $totalsQuery = Payment::query()
+            ->visibleTo(auth()->user())
             ->where('status', 'active')
             ->when($this->search !== '', function (Builder $q): void {
                 $term = '%'.$this->search.'%';
@@ -381,6 +392,7 @@ class Index extends Component
         $detailCredit = null;
         if ($this->paymentId !== null) {
             $detailPayment = Payment::query()
+                ->visibleTo(auth()->user())
                 ->with(['customer', 'receiver', 'reverser', 'allocations.invoice'])
                 ->find($this->paymentId);
             if ($detailPayment) {
@@ -434,6 +446,7 @@ class Index extends Component
         }
 
         $this->formAllocations = Invoice::query()
+            ->visibleTo(auth()->user())
             ->where('customer_id', $this->formCustomerId)
             ->whereIn('status', ['issued', 'partially_paid'])
             ->orderBy('issue_date')

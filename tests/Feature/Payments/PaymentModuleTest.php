@@ -52,9 +52,10 @@ function makeCustomer(): Customer
 }
 
 /**
- * Create a issued invoice row ready for payment allocation.
+ * Create an issued invoice row ready for payment allocation.
+ * Pass $location to share one location across multiple invoices (needed for multi-invoice payments).
  */
-function makePaymentInvoice(Customer $customer, string $total, string $amountPaid = '0.00'): Invoice
+function makePaymentInvoice(Customer $customer, string $total, string $amountPaid = '0.00', ?Location $location = null): Invoice
 {
     $status = match (true) {
         bccomp($amountPaid, '0.00', 2) === 0 => InvoiceStatus::Issued,
@@ -62,7 +63,9 @@ function makePaymentInvoice(Customer $customer, string $total, string $amountPai
         default => InvoiceStatus::PartiallyPaid,
     };
 
-    $location = Location::forceCreate(['name' => 'WH-PAY-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT), 'type' => 'warehouse', 'is_active' => true]);
+    if ($location === null) {
+        $location = Location::forceCreate(['name' => 'WH-PAY-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT), 'type' => 'warehouse', 'is_active' => true]);
+    }
 
     if (auth()->check()) {
         grantLocation(auth()->user(), $location);
@@ -151,8 +154,11 @@ test('one payment across multiple invoices allocates correctly', function (): vo
     $this->actingAs($user);
 
     $customer = makeCustomer();
-    $inv1 = makePaymentInvoice($customer, '300.00');
-    $inv2 = makePaymentInvoice($customer, '200.00');
+    // Both invoices must share the same location; non-admin users may not span locations.
+    $sharedLoc = Location::forceCreate(['name' => 'WH-MULTI-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT), 'type' => 'warehouse', 'is_active' => true]);
+    grantLocation($user, $sharedLoc);
+    $inv1 = makePaymentInvoice($customer, '300.00', '0.00', $sharedLoc);
+    $inv2 = makePaymentInvoice($customer, '200.00', '0.00', $sharedLoc);
 
     $payment = app(RecordPayment::class)(
         paymentData($customer, '500.00', [
@@ -508,8 +514,9 @@ test('payments index screen loads and shows existing payments', function (): voi
     $this->actingAs($user);
 
     $customer = makeCustomer();
+    $invoice = makePaymentInvoice($customer, '250.00');
     $payment = app(RecordPayment::class)(
-        paymentData($customer, '250.00'),
+        paymentData($customer, '250.00', [['invoice_id' => $invoice->id, 'amount' => '250.00']]),
         (string) Str::uuid(),
     );
 
@@ -525,9 +532,11 @@ test('payments index filters by customer name', function (): void {
 
     $customerA = makeCustomer();
     $customerB = makeCustomer();
+    $invA = makePaymentInvoice($customerA, '100.00');
+    $invB = makePaymentInvoice($customerB, '200.00');
 
-    app(RecordPayment::class)(paymentData($customerA, '100.00'), (string) Str::uuid());
-    app(RecordPayment::class)(paymentData($customerB, '200.00'), (string) Str::uuid());
+    app(RecordPayment::class)(paymentData($customerA, '100.00', [['invoice_id' => $invA->id, 'amount' => '100.00']]), (string) Str::uuid());
+    app(RecordPayment::class)(paymentData($customerB, '200.00', [['invoice_id' => $invB->id, 'amount' => '200.00']]), (string) Str::uuid());
 
     Livewire::actingAs($user)
         ->test(PaymentsIndex::class)
@@ -540,8 +549,9 @@ test('payments index totals bar shows active payment total', function (): void {
     $user = paymentUser(['payments.view', 'payments.create']);
     $this->actingAs($user);
     $customer = makeCustomer();
+    $invoice = makePaymentInvoice($customer, '1000.00');
 
-    app(RecordPayment::class)(paymentData($customer, '1000.00'), (string) Str::uuid());
+    app(RecordPayment::class)(paymentData($customer, '1000.00', [['invoice_id' => $invoice->id, 'amount' => '1000.00']]), (string) Str::uuid());
 
     Livewire::actingAs($user)
         ->test(PaymentsIndex::class)
@@ -554,11 +564,12 @@ test('payment receipt PDF is returned for authorised user', function (): void {
     $user = paymentUser(['payments.view', 'payments.create']);
     $this->actingAs($user);
     $customer = makeCustomer();
+    $invoice = makePaymentInvoice($customer, '450.00');
 
     app(Settings::class)->put('business.name', 'Test Store Ltd');
 
     $payment = app(RecordPayment::class)(
-        paymentData($customer, '450.00'),
+        paymentData($customer, '450.00', [['invoice_id' => $invoice->id, 'amount' => '450.00']]),
         (string) Str::uuid(),
     );
 

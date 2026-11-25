@@ -781,10 +781,13 @@ test('thermal_receipt_with_many_allocations_renders_a_pdf', function (): void {
     $customer = walkInCustomer();
     $this->actingAs($user);
 
+    grantLocation($user, $location);
+
     // Create a payment with 10 invoice allocations
     $payment = Payment::forceCreate([
         'number' => 'PAY-MANY-'.random_int(1, 99999),
         'customer_id' => $customer->id,
+        'location_id' => $location->id,
         'method' => 'cash',
         'amount' => '1000.00',
         'received_at' => now(),

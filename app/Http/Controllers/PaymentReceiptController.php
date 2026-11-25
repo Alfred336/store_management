@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Payment;
+use App\Services\Access\LocationAccess;
 use App\Services\Settings\Settings;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Response;
@@ -21,6 +22,14 @@ class PaymentReceiptController extends Controller
     public function __invoke(Payment $payment, Settings $settings): Response
     {
         $this->authorize('view', $payment);
+
+        $access = app(LocationAccess::class);
+        if ($payment->location_id !== null) {
+            $access->ensure(auth()->user(), $payment->location_id);
+        } else {
+            // Null-location payments (unallocated/multi-location) are Admin-only.
+            abort_unless($access->allowedLocationIds(auth()->user()) === null, 403);
+        }
 
         $mode = request()->input('mode') === 'download' ? 'download' : 'inline';
 

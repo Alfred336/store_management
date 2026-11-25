@@ -81,7 +81,7 @@ function makeTestLocation(?string $name = null): Location
 /** Attach locations to a user (without removing existing ones) and flush the LocationAccess cache. */
 function grantLocation(User $user, Location ...$locations): User
 {
-    $user->locations()->attach(collect($locations)->pluck('id')->all());
+    $user->locations()->syncWithoutDetaching(collect($locations)->pluck('id')->all());
     app(LocationAccess::class)->flush($user->id);
 
     return $user;

@@ -5,6 +5,8 @@ namespace App\Livewire\Actions\Customers;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\User;
+use App\Services\Access\LocationAccess;
 use App\Services\Customers\CustomerBalance;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -19,27 +21,40 @@ class GetCustomerStatement
     /**
      * @return array{balance: string, total_spent: string, last_purchase_date: string|null, invoices: Collection<int, array<string, mixed>>, payments: Collection<int, array{id: int, number: string, amount: string, method: string, reference: string|null, received_at: string, status: string}>}
      */
-    public function __invoke(Customer $customer, ?int $limit = 10): array
+    public function __invoke(Customer $customer, ?int $limit = 10, ?User $user = null): array
     {
         Gate::authorize('view', $customer);
 
+        // The full balance (used for credit-limit checks) is always computed across
+        // ALL locations — location filtering only affects the display lists below.
         $summary = $this->customerBalance->summary($customer);
 
         return [
             'balance' => $summary['balance'],
             'total_spent' => $summary['total_spent'],
             'last_purchase_date' => $summary['last_purchase_date'],
-            'invoices' => $this->recentInvoices($customer, $limit),
-            'payments' => $this->recentPayments($customer, $limit),
+            'invoices' => $this->recentInvoices($customer, $limit, $user),
+            'payments' => $this->recentPayments($customer, $limit, $user),
         ];
     }
 
     /** @return Collection<int, array<string, mixed>> */
-    private function recentInvoices(Customer $customer, ?int $limit): Collection
+    private function recentInvoices(Customer $customer, ?int $limit, ?User $user): Collection
     {
-        $query = $customer->invoices()
-            ->orderByDesc('issue_date')
-            ->orderByDesc('id');
+        $query = $customer->invoices();
+
+        if ($user !== null) {
+            $ids = app(LocationAccess::class)->allowedLocationIds($user);
+            if ($ids === null) {
+                // Admin: unrestricted — no filter
+            } elseif (empty($ids)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('invoices.location_id', $ids);
+            }
+        }
+
+        $query->orderByDesc('issue_date')->orderByDesc('id');
 
         if ($limit !== null) {
             $query->limit($limit);
@@ -61,11 +76,23 @@ class GetCustomerStatement
     }
 
     /** @return Collection<int, array{id: int, number: string, amount: string, method: string, reference: string|null, received_at: string, status: string}> */
-    private function recentPayments(Customer $customer, ?int $limit): Collection
+    private function recentPayments(Customer $customer, ?int $limit, ?User $user): Collection
     {
-        $query = $customer->payments()
-            ->orderByDesc('received_at')
-            ->orderByDesc('id');
+        $query = $customer->payments();
+
+        if ($user !== null) {
+            $ids = app(LocationAccess::class)->allowedLocationIds($user);
+            if ($ids === null) {
+                // Admin: unrestricted — no filter
+            } elseif (empty($ids)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                // Null-location payments are not visible to restricted users.
+                $query->whereIn('payments.location_id', $ids);
+            }
+        }
+
+        $query->orderByDesc('received_at')->orderByDesc('id');
 
         if ($limit !== null) {
             $query->limit($limit);

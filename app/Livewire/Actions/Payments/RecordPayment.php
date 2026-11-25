@@ -7,6 +7,8 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\PosSession;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\DocumentNumberingService;
 use App\Services\Money\Money;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +24,10 @@ use Illuminate\Validation\ValidationException;
  * - Allocation amounts may not exceed each invoice's current balance.
  * - Any amount not allocated remains as unallocated customer credit.
  * - Invoice rows are locked in ascending id order to prevent deadlocks.
+ * - Each invoice's location is checked via LocationAccess::ensure().
+ * - Allocations spanning invoices at different locations are refused for non-Admin users.
+ *   Admin users may span locations; the payment's location_id is set to null in that case.
+ * - For POS payments the location comes from the POS session.
  */
 class RecordPayment
 {
@@ -123,12 +129,54 @@ class RecordPayment
                 throw ValidationException::withMessages(['amount' => 'Total allocations exceed the payment amount.']);
             }
 
+            // ── Location access ──────────────────────────────────────────────────
+            $access = app(LocationAccess::class);
+            $paymentLocationId = null;
+
+            $posSessionId = $data['pos_session_id'] ?? null;
+            if ($posSessionId !== null) {
+                $session = PosSession::query()->whereKey($posSessionId)->first();
+                if ($session !== null) {
+                    $access->ensure(auth()->user(), $session->location_id);
+                    $paymentLocationId = $session->location_id;
+                }
+            }
+
+            if ($invoiceIds !== []) {
+                /** @var list<int> $invoiceLocationIds */
+                $invoiceLocationIds = collect($invoices)
+                    ->pluck('location_id')
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                foreach ($invoiceLocationIds as $locId) {
+                    $access->ensure(auth()->user(), (int) $locId);
+                }
+
+                if ($posSessionId === null) {
+                    if (count($invoiceLocationIds) === 1) {
+                        $paymentLocationId = (int) $invoiceLocationIds[0];
+                    } else {
+                        // Multi-location: only Admin users (allowedLocationIds === null) may proceed.
+                        if ($access->allowedLocationIds(auth()->user()) !== null) {
+                            throw ValidationException::withMessages([
+                                'allocations' => 'You may not allocate a payment across invoices at different locations.',
+                            ]);
+                        }
+                        // Admin: payment location stays null (spans multiple locations).
+                    }
+                }
+            }
+            // ────────────────────────────────────────────────────────────────────
+
             // Create the payment
             $number = $this->numbering->next('payment');
 
             $payment = Payment::create([
                 'number' => $number,
                 'customer_id' => $customer->id,
+                'location_id' => $paymentLocationId,
                 'method' => $data['method'],
                 'provider' => $data['provider'] ?? null,
                 'reference' => $data['reference'] ?? null,
@@ -140,7 +188,7 @@ class RecordPayment
                 'status' => 'active',
                 'notes' => $data['notes'] ?? null,
                 'idempotency_key' => $idempotencyKey,
-                'pos_session_id' => $data['pos_session_id'] ?? null,
+                'pos_session_id' => $posSessionId,
             ]);
 
             // Apply allocations

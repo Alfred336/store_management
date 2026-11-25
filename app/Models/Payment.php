@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Services\Access\LocationAccess;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $number
  * @property int $customer_id
+ * @property int|null $location_id
  * @property string $method
  * @property string|null $provider
  * @property string|null $reference
@@ -34,7 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Payment extends Model
 {
     protected $fillable = [
-        'number', 'customer_id', 'method', 'provider', 'reference',
+        'number', 'customer_id', 'location_id', 'method', 'provider', 'reference',
         'amount', 'amount_tendered', 'change_given',
         'received_at', 'received_by', 'status',
         'reversed_by', 'reversed_at', 'reverse_reason', 'notes',
@@ -56,6 +59,12 @@ class Payment extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /** @return BelongsTo<Location, $this> */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     /** @return BelongsTo<User, $this> */
@@ -98,5 +107,30 @@ class Payment extends Model
     public function isActive(): bool
     {
         return $this->status === 'active';
+    }
+
+    /**
+     * Restrict results to payments the given user may see.
+     *
+     * - Admin (allowedLocationIds === null): all payments, including null-location ones.
+     * - Restricted user: only payments with a location_id in their allowed set.
+     *   Null-location (unallocated/multi-location) payments are excluded.
+     *
+     * @param  Builder<Payment>  $query
+     * @return Builder<Payment>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = app(LocationAccess::class)->allowedLocationIds($user);
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        if (empty($ids)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('payments.location_id', $ids);
     }
 }

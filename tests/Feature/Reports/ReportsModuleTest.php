@@ -610,6 +610,7 @@ test('payments by method shows active payment amount and excludes reversed payme
     $customer = reportCustomer();
     $invoice = reportInvoice($customer, $location, '2500.00', '0.00', '0.00', InvoiceStatus::Issued, $today);
 
+    grantLocation($admin, $location);
     $this->actingAs($admin);
 
     $payment = app(RecordPayment::class)([
@@ -654,6 +655,7 @@ test('payments by method location filter includes back-office payment via invoic
     $rufijInvoice = reportInvoice($customer, $rufiji, '3000.00', '0.00', '0.00', InvoiceStatus::Issued, $today);
     $otherInvoice = reportInvoice($customer, $other, '999.00', '0.00', '0.00', InvoiceStatus::Issued, $today);
 
+    grantLocation($admin, $rufiji, $other);
     $this->actingAs($admin);
 
     // Back-office payment (no pos_session_id) for Rufiji invoice
