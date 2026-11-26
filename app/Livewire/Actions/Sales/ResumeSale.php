@@ -3,6 +3,7 @@
 namespace App\Livewire\Actions\Sales;
 
 use App\Models\PosHeldSale;
+use App\Services\Access\LocationAccess;
 use Illuminate\Validation\ValidationException;
 
 /** Restore a held cart and delete its record. */
@@ -19,6 +20,9 @@ class ResumeSale
         if (! $isOwn && ! auth()->user()->can('pos.close_any_session')) {
             throw ValidationException::withMessages(['held_sale' => 'You can only resume your own held sales.']);
         }
+
+        // User must have access to the held sale's location regardless of ownership.
+        app(LocationAccess::class)->ensure(auth()->user(), $held->location_id);
 
         $held->delete();
 

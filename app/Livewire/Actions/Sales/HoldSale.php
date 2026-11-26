@@ -3,6 +3,7 @@
 namespace App\Livewire\Actions\Sales;
 
 use App\Models\PosHeldSale;
+use App\Services\Access\LocationAccess;
 
 /** Persist the current cart for later resumption. Does not touch stock, numbering, or payments. */
 class HoldSale
@@ -19,6 +20,8 @@ class HoldSale
     public function __invoke(array $data): PosHeldSale
     {
         abort_unless(auth()->user()?->can('pos.use'), 403);
+
+        app(LocationAccess::class)->ensure(auth()->user(), (int) $data['location_id']);
 
         return PosHeldSale::query()->create([
             'user_id' => auth()->id(),

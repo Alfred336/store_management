@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\PosSession;
 use App\Models\Product;
+use App\Services\Access\LocationAccess;
 use App\Services\Customers\CreditLimitService;
 use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Money\Money;
@@ -70,6 +71,8 @@ class CompletePosSale
             if ($session === null || ! $session->isOpen()) {
                 throw ValidationException::withMessages(['session' => 'An open POS session is required.']);
             }
+
+            app(LocationAccess::class)->ensure(auth()->user(), $session->location_id);
 
             // 2. Load and validate customer
             $customer = Customer::query()->whereKey($customerId)->lockForUpdate()->first();

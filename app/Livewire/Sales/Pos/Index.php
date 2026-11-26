@@ -13,6 +13,7 @@ use App\Models\Location;
 use App\Models\PosHeldSale;
 use App\Models\PosSession;
 use App\Models\Product;
+use App\Services\Access\LocationAccess;
 use App\Services\Invoicing\InvoiceCalculator;
 use App\Services\Settings\Settings;
 use Flux\Flux;
@@ -109,6 +110,16 @@ class Index extends Component
     public function openSession(OpenPosSession $action): void
     {
         abort_unless(auth()->user()?->can('pos.open_session'), 403);
+
+        // A user with multiple allowed locations must choose one before opening a session.
+        $access = app(LocationAccess::class);
+        $user = auth()->user();
+        $ids = $access->allowedLocationIds($user);
+        if ((int) $this->openLocationId === 0 && $ids !== null && count($ids) > 1) {
+            $this->addError('session', 'You have access to multiple locations. Please select a location to open a session.');
+
+            return;
+        }
 
         try {
             $session = $action([
@@ -585,7 +596,7 @@ class Index extends Component
             ? Customer::query()->find($this->customerId)
             : null;
 
-        $locations = Location::query()->where('is_active', true)->orderBy('name')->get();
+        $locations = app(LocationAccess::class)->allowedLocations(auth()->user());
 
         $currency = app(Settings::class)->get('business.currency', 'TZS');
 

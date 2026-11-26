@@ -11,10 +11,14 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class PosSessionsExport implements FromCollection, WithHeadings, WithMapping
 {
+    /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; empty = no access
+     */
     public function __construct(
         private readonly string $dateFrom,
         private readonly string $dateTo,
         private readonly ?int $locationId = null,
+        private readonly ?array $allowedIds = null,
     ) {}
 
     /** @return Collection<int, \stdClass> */
@@ -43,6 +47,8 @@ class PosSessionsExport implements FromCollection, WithHeadings, WithMapping
             ->where('pos_sessions.opened_at', '>=', $start)
             ->where('pos_sessions.opened_at', '<', $end)
             ->when($this->locationId !== null, fn ($q) => $q->where('pos_sessions.location_id', $this->locationId))
+            ->when($this->allowedIds !== null && empty($this->allowedIds), fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($this->allowedIds !== null && ! empty($this->allowedIds), fn ($q) => $q->whereIn('pos_sessions.location_id', $this->allowedIds))
             ->orderBy('pos_sessions.opened_at', 'desc')
             ->get();
     }

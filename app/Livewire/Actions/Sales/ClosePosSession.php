@@ -3,6 +3,7 @@
 namespace App\Livewire\Actions\Sales;
 
 use App\Models\PosSession;
+use App\Services\Access\LocationAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -21,6 +22,9 @@ class ClosePosSession
             abort_unless($user?->can('pos.close_session'), 403);
         } else {
             abort_unless($user?->can('pos.close_any_session'), 403);
+            // Managers closing another user's session are limited to their allowed locations.
+            // A user can always close their own session even if they lost location access (req. 6).
+            app(LocationAccess::class)->ensure(auth()->user(), $session->location_id);
         }
 
         if (! $session->isOpen()) {

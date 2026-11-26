@@ -9,14 +9,17 @@ use Illuminate\Support\Facades\DB;
 /** POS Sessions: closed sessions with cash reconciliation summary. */
 class PosSessionsService
 {
-    /** @return LengthAwarePaginator<int, \stdClass> */
-    public function paginate(Carbon $from, Carbon $to, ?int $locationId = null, int $perPage = 50): LengthAwarePaginator
+    /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted (Admin); empty = no access
+     * @return LengthAwarePaginator<int, \stdClass>
+     */
+    public function paginate(Carbon $from, Carbon $to, ?int $locationId = null, int $perPage = 50, ?array $allowedIds = null): LengthAwarePaginator
     {
         // Half-open range against opened_at (stored in app local time).
         $start = $from->toDateTimeString();
         $end = $to->copy()->addSecond()->toDateTimeString();
 
-        return DB::table('pos_sessions')
+        $query = DB::table('pos_sessions')
             ->join('users', 'users.id', '=', 'pos_sessions.user_id')
             ->join('locations', 'locations.id', '=', 'pos_sessions.location_id')
             ->leftJoin('users AS closed_by_user', 'closed_by_user.id', '=', 'pos_sessions.closed_by')
@@ -37,7 +40,16 @@ class PosSessionsService
             ->where('pos_sessions.opened_at', '>=', $start)
             ->where('pos_sessions.opened_at', '<', $end)
             ->when($locationId !== null, fn ($q) => $q->where('pos_sessions.location_id', $locationId))
-            ->orderBy('pos_sessions.opened_at', 'desc')
-            ->paginate($perPage);
+            ->orderBy('pos_sessions.opened_at', 'desc');
+
+        if ($allowedIds !== null) {
+            if (empty($allowedIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('pos_sessions.location_id', $allowedIds);
+            }
+        }
+
+        return $query->paginate($perPage);
     }
 }

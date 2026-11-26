@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
+use App\Services\Access\LocationAccess;
 use App\Services\Reports\InventoryReportService;
 use App\Services\Reports\PaymentsByMethodService;
 use App\Services\Reports\PosSessionsService;
@@ -85,12 +86,22 @@ class ReportPdfController extends Controller
                 $paymentsByMethod->get($from, $to, $locationId),
                 ['company' => $company, 'filters' => $filters, 'title' => 'Payments by Method']
             ),
-            'pos-sessions' => [
-                'sessions' => $posSessions->paginate($from, $to, $locationId, 500),
-                'company' => $company,
-                'filters' => $filters,
-                'title' => 'POS Sessions',
-            ],
+            'pos-sessions' => (function () use ($posSessions, $from, $to, $locationId, $company, $filters): array {
+                $access = app(LocationAccess::class);
+                $user = auth()->user();
+                // If a specific location was requested, verify the user can access it.
+                if ($locationId !== null) {
+                    $access->ensure($user, $locationId);
+                }
+                $allowedIds = $access->allowedLocationIds($user);
+
+                return [
+                    'sessions' => $posSessions->paginate($from, $to, $locationId, 500, $allowedIds),
+                    'company' => $company,
+                    'filters' => $filters,
+                    'title' => 'POS Sessions',
+                ];
+            })(),
             'inventory' => (function () use ($request, $inventoryReport, $company, $filters): array {
                 $categoryId = $request->filled('categoryId') ? (int) $request->input('categoryId') : null;
                 $locationId = $filters['location_id'];

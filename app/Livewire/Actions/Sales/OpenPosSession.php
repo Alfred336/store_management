@@ -4,6 +4,7 @@ namespace App\Livewire\Actions\Sales;
 
 use App\Models\Location;
 use App\Models\PosSession;
+use App\Services\Access\LocationAccess;
 use Illuminate\Validation\ValidationException;
 
 /** Open a new POS session for the authenticated cashier. Only one open session per user is allowed. */
@@ -21,6 +22,8 @@ class OpenPosSession
         if ($location === null) {
             throw ValidationException::withMessages(['location_id' => 'An active location is required.']);
         }
+
+        app(LocationAccess::class)->ensure(auth()->user(), $location->id);
 
         $openingCash = $data['opening_cash'] ?? '0.00';
         if (! is_numeric($openingCash) || bccomp((string) $openingCash, '0', 2) < 0) {
