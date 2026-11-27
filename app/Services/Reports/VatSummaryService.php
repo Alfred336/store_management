@@ -11,9 +11,10 @@ use Illuminate\Support\Facades\DB;
 class VatSummaryService
 {
     /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{rows: Collection<int, \stdClass>, totals: array{taxable_amount: string, exempt_amount: string, vat_amount: string, gross_total: string}}
      */
-    public function get(Carbon $from, Carbon $to, ?int $locationId = null): array
+    public function get(Carbon $from, Carbon $to, ?int $locationId = null, ?array $allowedIds = null): array
     {
         $posted = [
             InvoiceStatus::Issued->value,
@@ -32,6 +33,11 @@ class VatSummaryService
             ->whereNotNull('invoices.issue_date')
             ->whereBetween('invoices.issue_date', [$from->toDateString(), $to->toDateString()])
             ->when($locationId !== null, fn ($q) => $q->where('invoices.location_id', $locationId))
+            ->when($allowedIds !== null, function ($q) use ($allowedIds): void {
+                empty($allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('invoices.location_id', $allowedIds);
+            })
             ->groupByRaw("DATE_TRUNC('day', invoices.issue_date)")
             ->orderByRaw("DATE_TRUNC('day', invoices.issue_date)")
             ->get();

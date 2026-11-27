@@ -10,9 +10,11 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class InventoryReportExport implements FromCollection, WithHeadings, WithMapping
 {
+    /** @param list<int>|null $allowedIds null = unrestricted; [] = no access */
     public function __construct(
         private readonly ?int $locationId = null,
         private readonly ?int $categoryId = null,
+        private readonly ?array $allowedIds = null,
     ) {}
 
     /** @return Collection<int, \stdClass> */
@@ -37,6 +39,11 @@ class InventoryReportExport implements FromCollection, WithHeadings, WithMapping
             ->whereNull('products.deleted_at')
             ->when($this->locationId !== null, fn ($q) => $q->where('stock_levels.location_id', $this->locationId))
             ->when($this->categoryId !== null, fn ($q) => $q->where('products.category_id', $this->categoryId))
+            ->when($this->allowedIds !== null, function ($q): void {
+                empty($this->allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('stock_levels.location_id', $this->allowedIds);
+            })
             ->orderBy('products.name')
             ->orderBy('locations.name')
             ->get();

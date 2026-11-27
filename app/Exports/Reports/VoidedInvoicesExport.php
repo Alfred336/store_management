@@ -12,10 +12,12 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class VoidedInvoicesExport implements FromCollection, WithHeadings, WithMapping
 {
+    /** @param list<int>|null $allowedIds null = unrestricted; [] = no access */
     public function __construct(
         private readonly string $dateFrom,
         private readonly string $dateTo,
         private readonly ?int $locationId = null,
+        private readonly ?array $allowedIds = null,
     ) {}
 
     /** @return Collection<int, \stdClass> */
@@ -47,6 +49,11 @@ class VoidedInvoicesExport implements FromCollection, WithHeadings, WithMapping
             ->where('invoices.voided_at', '>=', $start)
             ->where('invoices.voided_at', '<', $end)
             ->when($this->locationId !== null, fn ($q) => $q->where('invoices.location_id', $this->locationId))
+            ->when($this->allowedIds !== null, function ($q): void {
+                empty($this->allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('invoices.location_id', $this->allowedIds);
+            })
             ->orderBy('invoices.voided_at', 'desc')
             ->get();
     }

@@ -10,8 +10,11 @@ use Illuminate\Support\Facades\DB;
 /** Voided Invoices Audit: invoices voided within the date range. */
 class VoidedInvoicesService
 {
-    /** @return LengthAwarePaginator<int, \stdClass> */
-    public function paginate(Carbon $from, Carbon $to, ?int $locationId = null, int $perPage = 50): LengthAwarePaginator
+    /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
+     * @return LengthAwarePaginator<int, \stdClass>
+     */
+    public function paginate(Carbon $from, Carbon $to, ?int $locationId = null, int $perPage = 50, ?array $allowedIds = null): LengthAwarePaginator
     {
         // Half-open range against voided_at (stored in app local time).
         $start = $from->toDateTimeString();
@@ -41,6 +44,11 @@ class VoidedInvoicesService
             ->where('invoices.voided_at', '>=', $start)
             ->where('invoices.voided_at', '<', $end)
             ->when($locationId !== null, fn ($q) => $q->where('invoices.location_id', $locationId))
+            ->when($allowedIds !== null, function ($q) use ($allowedIds): void {
+                empty($allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('invoices.location_id', $allowedIds);
+            })
             ->orderBy('invoices.voided_at', 'desc')
             ->paginate($perPage);
     }

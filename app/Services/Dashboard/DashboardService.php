@@ -54,6 +54,7 @@ class DashboardService
     /**
      * Returns KPIs for the current and previous period.
      *
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{
      *   total_sales: string,
      *   invoice_count: int,
@@ -64,14 +65,14 @@ class DashboardService
      *   payments_received_prev: string,
      * }
      */
-    public function salesKpis(string $period, ?int $locationId, bool $cashierOnly = false, int $userId = 0): array
+    public function salesKpis(string $period, ?int $locationId, bool $cashierOnly = false, int $userId = 0, ?array $allowedIds = null): array
     {
-        $key = "dashboard:sales:{$period}:{$locationId}:{$cashierOnly}:{$userId}";
+        $key = "dashboard:sales:{$period}:{$locationId}:{$cashierOnly}:{$userId}:".$this->allowedKey($allowedIds);
 
-        return Cache::remember($key, self::TTL, function () use ($period, $locationId, $cashierOnly, $userId): array {
+        return Cache::remember($key, self::TTL, function () use ($period, $locationId, $cashierOnly, $userId, $allowedIds): array {
             $bounds = $this->periodBounds($period);
 
-            $baseQuery = function (Carbon $start, Carbon $end) use ($locationId, $cashierOnly, $userId): object {
+            $baseQuery = function (Carbon $start, Carbon $end) use ($locationId, $cashierOnly, $userId, $allowedIds): object {
                 $q = DB::table('invoices')
                     ->whereIn('status', self::POSTED)
                     ->where('issued_at', '>=', $start->toDateTimeString())
@@ -79,6 +80,10 @@ class DashboardService
 
                 if ($locationId !== null) {
                     $q->where('location_id', $locationId);
+                }
+
+                if ($allowedIds !== null) {
+                    $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('location_id', $allowedIds);
                 }
 
                 if ($cashierOnly && $userId > 0) {
@@ -91,16 +96,18 @@ class DashboardService
             $curr = $baseQuery($bounds['start'], $bounds['end']);
             $prev = $baseQuery($bounds['prev_start'], $bounds['prev_end']);
 
-            $paymentsQuery = function (Carbon $start, Carbon $end) use ($locationId): string {
+            $paymentsQuery = function (Carbon $start, Carbon $end) use ($locationId, $allowedIds): string {
                 $q = DB::table('payments')
                     ->where('payments.status', 'active')
                     ->where('received_at', '>=', $start->toDateTimeString())
                     ->where('received_at', '<=', $end->toDateTimeString());
 
                 if ($locationId !== null) {
-                    $q->join('pos_sessions', 'payments.pos_session_id', '=', 'pos_sessions.id')
-                        ->where('pos_sessions.location_id', $locationId)
-                        ->whereNotNull('payments.pos_session_id');
+                    $q->where('payments.location_id', $locationId);
+                }
+
+                if ($allowedIds !== null) {
+                    $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('payments.location_id', $allowedIds);
                 }
 
                 return (string) $q->sum('amount');
@@ -127,18 +134,23 @@ class DashboardService
     /**
      * Outstanding receivables and overdue figures (not period-sensitive).
      *
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{outstanding: string, overdue_count: int, overdue_amount: string}
      */
-    public function receivablesKpis(?int $locationId): array
+    public function receivablesKpis(?int $locationId, ?array $allowedIds = null): array
     {
-        $key = "dashboard:receivables:{$locationId}";
+        $key = "dashboard:receivables:{$locationId}:".$this->allowedKey($allowedIds);
 
-        return Cache::remember($key, self::TTL, function () use ($locationId): array {
+        return Cache::remember($key, self::TTL, function () use ($locationId, $allowedIds): array {
             $base = DB::table('invoices')
                 ->whereIn('status', ['issued', 'partially_paid']);
 
             if ($locationId !== null) {
                 $base->where('location_id', $locationId);
+            }
+
+            if ($allowedIds !== null) {
+                $allowedIds === [] ? $base->whereRaw('1 = 0') : $base->whereIn('location_id', $allowedIds);
             }
 
             $outstanding = (string) ($base->clone()->selectRaw('COALESCE(SUM(total - amount_paid), 0) as v')->value('v') ?? '0');
@@ -159,18 +171,23 @@ class DashboardService
     /**
      * Open quotations (draft + sent).
      *
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{open_count: int, open_value: string}
      */
-    public function quotationKpis(?int $locationId): array
+    public function quotationKpis(?int $locationId, ?array $allowedIds = null): array
     {
-        $key = "dashboard:quotations:{$locationId}";
+        $key = "dashboard:quotations:{$locationId}:".$this->allowedKey($allowedIds);
 
-        return Cache::remember($key, self::TTL, function () use ($locationId): array {
+        return Cache::remember($key, self::TTL, function () use ($locationId, $allowedIds): array {
             $q = DB::table('quotations')
                 ->whereIn('status', ['draft', 'sent']);
 
             if ($locationId !== null) {
                 $q->where('location_id', $locationId);
+            }
+
+            if ($allowedIds !== null) {
+                $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('location_id', $allowedIds);
             }
 
             $row = $q->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total), 0) as val')->first();
@@ -185,50 +202,73 @@ class DashboardService
     // ─── Inventory KPIs ───────────────────────────────────────────────────
 
     /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{out_of_stock: int, low_stock: int, expiring_30: int, expired: int}
      */
-    public function inventoryKpis(): array
+    public function inventoryKpis(?array $allowedIds = null): array
     {
-        return Cache::remember('dashboard:inventory', self::TTL, function (): array {
+        $key = 'dashboard:inventory:'.$this->allowedKey($allowedIds);
+
+        return Cache::remember($key, self::TTL, function () use ($allowedIds): array {
             $today = Carbon::today()->toDateString();
             $in30 = Carbon::today()->addDays(30)->toDateString();
 
-            // Out of stock: total qty = 0 or no row
+            if ($allowedIds === []) {
+                return ['out_of_stock' => 0, 'low_stock' => 0, 'expiring_30' => 0, 'expired' => 0];
+            }
+
+            // Out of stock: no stock row with qty > 0 at allowed locations.
             $outOfStock = DB::table('products')
                 ->where('is_active', true)
                 ->whereNull('deleted_at')
-                ->whereRaw(
-                    '(SELECT COALESCE(SUM(sl.quantity),0) FROM stock_levels sl WHERE sl.product_id = products.id) = 0'
-                )
+                ->whereNotExists(function ($q) use ($allowedIds): void {
+                    $q->select(DB::raw('1'))
+                        ->from('stock_levels as sl')
+                        ->whereColumn('sl.product_id', 'products.id')
+                        ->where('sl.quantity', '>', 0);
+                    if ($allowedIds !== null) {
+                        $q->whereIn('sl.location_id', $allowedIds);
+                    }
+                })
                 ->count();
 
-            // Low stock: qty > 0, reorder_level > 0, qty <= reorder_level
-            $lowStock = DB::table('products')
-                ->where('is_active', true)
-                ->whereNull('deleted_at')
-                ->whereRaw('reorder_level > 0')
-                ->whereRaw(
-                    '(SELECT COALESCE(SUM(sl.quantity),0) FROM stock_levels sl WHERE sl.product_id = products.id) <= products.reorder_level'
-                )
-                ->whereRaw(
-                    '(SELECT COALESCE(SUM(sl.quantity),0) FROM stock_levels sl WHERE sl.product_id = products.id) > 0'
-                )
+            // Low stock: total qty > 0 but <= reorder_level, using a derived-table count.
+            $lowStock = DB::table(function ($q) use ($allowedIds): void {
+                $q->from('products')
+                    ->leftJoin('stock_levels as sl', function ($join) use ($allowedIds): void {
+                        $join->on('sl.product_id', '=', 'products.id');
+                        if ($allowedIds !== null) {
+                            $join->whereIn('sl.location_id', $allowedIds);
+                        }
+                    })
+                    ->where('products.is_active', true)
+                    ->whereNull('products.deleted_at')
+                    ->whereRaw('products.reorder_level > 0')
+                    ->groupBy('products.id', 'products.reorder_level')
+                    ->havingRaw('COALESCE(SUM(sl.quantity), 0) > 0')
+                    ->havingRaw('COALESCE(SUM(sl.quantity), 0) <= products.reorder_level')
+                    ->select('products.id');
+            }, 'low_sub')
                 ->count();
 
-            $expiring = DB::table('stock_levels')
+            $expiringQ = DB::table('stock_levels')
                 ->join('batches', 'batches.id', '=', 'stock_levels.batch_id')
                 ->where('batches.expiry_date', '>=', $today)
                 ->where('batches.expiry_date', '<=', $in30)
-                ->where('stock_levels.quantity', '>', 0)
-                ->distinct('stock_levels.batch_id')
-                ->count('stock_levels.batch_id');
+                ->where('stock_levels.quantity', '>', 0);
+            if ($allowedIds !== null) {
+                $expiringQ->whereIn('stock_levels.location_id', $allowedIds);
+            }
+            $expiring = $expiringQ->distinct('stock_levels.batch_id')->count('stock_levels.batch_id');
 
-            $expired = DB::table('stock_levels')
+            $expiredQ = DB::table('stock_levels')
                 ->join('batches', 'batches.id', '=', 'stock_levels.batch_id')
                 ->where('batches.expiry_date', '<', $today)
-                ->where('stock_levels.quantity', '>', 0)
-                ->distinct('stock_levels.batch_id')
-                ->count('stock_levels.batch_id');
+                ->where('stock_levels.quantity', '>', 0);
+            if ($allowedIds !== null) {
+                $expiredQ->whereIn('stock_levels.location_id', $allowedIds);
+            }
+            $expired = $expiredQ->distinct('stock_levels.batch_id')->count('stock_levels.batch_id');
 
             return [
                 'out_of_stock' => $outOfStock,
@@ -242,38 +282,54 @@ class DashboardService
     /**
      * 8 most urgent inventory items (expired first, then by urgency).
      *
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return Collection<int, \stdClass>
      */
-    public function urgentInventoryItems(): Collection
+    public function urgentInventoryItems(?array $allowedIds = null): Collection
     {
-        return $this->cachedRows('dashboard:urgent_items', function (): Collection {
-            // Out-of-stock active products
+        $key = 'dashboard:urgent_items:'.$this->allowedKey($allowedIds);
+
+        return $this->cachedRows($key, function () use ($allowedIds): Collection {
+            if ($allowedIds === []) {
+                return collect();
+            }
+
+            // Out-of-stock active products (no stock row with qty > 0 at allowed locations).
             $oos = DB::table('products')
                 ->where('is_active', true)
                 ->whereNull('deleted_at')
-                ->whereRaw(
-                    '(SELECT COALESCE(SUM(sl.quantity),0) FROM stock_levels sl WHERE sl.product_id = products.id) = 0'
-                )
+                ->whereNotExists(function ($q) use ($allowedIds): void {
+                    $q->select(DB::raw('1'))
+                        ->from('stock_levels as sl')
+                        ->whereColumn('sl.product_id', 'products.id')
+                        ->where('sl.quantity', '>', 0);
+                    if ($allowedIds !== null) {
+                        $q->whereIn('sl.location_id', $allowedIds);
+                    }
+                })
                 ->select('products.id', 'products.name', DB::raw("'out_of_stock' as issue_type"), DB::raw('0 as qty'))
                 ->limit(4)
                 ->get();
 
-            // Low-stock active products
+            // Low-stock active products (total qty > 0 but <= reorder_level).
             $low = DB::table('products')
-                ->where('is_active', true)
-                ->whereNull('deleted_at')
-                ->whereRaw('reorder_level > 0')
-                ->whereRaw(
-                    '(SELECT COALESCE(SUM(sl.quantity),0) FROM stock_levels sl WHERE sl.product_id = products.id) <= products.reorder_level'
-                )
-                ->whereRaw(
-                    '(SELECT COALESCE(SUM(sl.quantity),0) FROM stock_levels sl WHERE sl.product_id = products.id) > 0'
-                )
+                ->leftJoin('stock_levels as sl', function ($join) use ($allowedIds): void {
+                    $join->on('sl.product_id', '=', 'products.id');
+                    if ($allowedIds !== null) {
+                        $join->whereIn('sl.location_id', $allowedIds);
+                    }
+                })
+                ->where('products.is_active', true)
+                ->whereNull('products.deleted_at')
+                ->whereRaw('products.reorder_level > 0')
+                ->groupBy('products.id', 'products.name', 'products.reorder_level')
+                ->havingRaw('COALESCE(SUM(sl.quantity), 0) > 0')
+                ->havingRaw('COALESCE(SUM(sl.quantity), 0) <= products.reorder_level')
                 ->select(
                     'products.id',
                     'products.name',
                     DB::raw("'low_stock' as issue_type"),
-                    DB::raw('(SELECT COALESCE(SUM(sl.quantity),0) FROM stock_levels sl WHERE sl.product_id = products.id) as qty'),
+                    DB::raw('COALESCE(SUM(sl.quantity), 0) as qty'),
                 )
                 ->limit(4)
                 ->get();
@@ -285,13 +341,14 @@ class DashboardService
     // ─── Lists ────────────────────────────────────────────────────────────
 
     /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return Collection<int, \stdClass>
      */
-    public function recentInvoices(?int $locationId, bool $cashierOnly = false, int $userId = 0): Collection
+    public function recentInvoices(?int $locationId, bool $cashierOnly = false, int $userId = 0, ?array $allowedIds = null): Collection
     {
-        $key = "dashboard:recent_invoices:{$locationId}:{$cashierOnly}:{$userId}";
+        $key = "dashboard:recent_invoices:{$locationId}:{$cashierOnly}:{$userId}:".$this->allowedKey($allowedIds);
 
-        return $this->cachedRows($key, function () use ($locationId, $cashierOnly, $userId): Collection {
+        return $this->cachedRows($key, function () use ($locationId, $cashierOnly, $userId, $allowedIds): Collection {
             $q = DB::table('invoices')
                 ->join('customers', 'customers.id', '=', 'invoices.customer_id')
                 ->whereIn('invoices.status', self::POSTED)
@@ -310,6 +367,10 @@ class DashboardService
                 $q->where('invoices.location_id', $locationId);
             }
 
+            if ($allowedIds !== null) {
+                $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('invoices.location_id', $allowedIds);
+            }
+
             if ($cashierOnly && $userId > 0) {
                 $q->where('invoices.issued_by', $userId);
             }
@@ -319,13 +380,14 @@ class DashboardService
     }
 
     /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return Collection<int, \stdClass>
      */
-    public function topProducts(string $period, ?int $locationId): Collection
+    public function topProducts(string $period, ?int $locationId, ?array $allowedIds = null): Collection
     {
-        $key = "dashboard:top_products:{$period}:{$locationId}";
+        $key = "dashboard:top_products:{$period}:{$locationId}:".$this->allowedKey($allowedIds);
 
-        return $this->cachedRows($key, function () use ($period, $locationId): Collection {
+        return $this->cachedRows($key, function () use ($period, $locationId, $allowedIds): Collection {
             $bounds = $this->periodBounds($period);
 
             $q = DB::table('invoice_items')
@@ -345,6 +407,10 @@ class DashboardService
                 $q->where('invoices.location_id', $locationId);
             }
 
+            if ($allowedIds !== null) {
+                $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('invoices.location_id', $allowedIds);
+            }
+
             return $q->groupBy('products.id', 'products.name')
                 ->orderByDesc('revenue')
                 ->limit(5)
@@ -353,11 +419,14 @@ class DashboardService
     }
 
     /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return Collection<int, \stdClass>
      */
-    public function overdueInvoices(?int $locationId): Collection
+    public function overdueInvoices(?int $locationId, ?array $allowedIds = null): Collection
     {
-        return $this->cachedRows("dashboard:overdue:{$locationId}", function () use ($locationId): Collection {
+        $key = "dashboard:overdue:{$locationId}:".$this->allowedKey($allowedIds);
+
+        return $this->cachedRows($key, function () use ($locationId, $allowedIds): Collection {
             $q = DB::table('invoices')
                 ->join('customers', 'customers.id', '=', 'invoices.customer_id')
                 ->whereIn('invoices.status', ['issued', 'partially_paid'])
@@ -372,6 +441,10 @@ class DashboardService
 
             if ($locationId !== null) {
                 $q->where('invoices.location_id', $locationId);
+            }
+
+            if ($allowedIds !== null) {
+                $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('invoices.location_id', $allowedIds);
             }
 
             return $q->orderBy('invoices.due_date')->limit(8)->get();
@@ -400,18 +473,39 @@ class DashboardService
         return collect($rows)->map(fn (array $r): \stdClass => (object) $r);
     }
 
+    /**
+     * Compute a compact cache-key segment from an allowed-locations list.
+     * null = Admin (all), [] = no access, int[] = specific set.
+     *
+     * @param  list<int>|null  $allowedIds
+     */
+    private function allowedKey(?array $allowedIds): string
+    {
+        if ($allowedIds === null) {
+            return 'all';
+        }
+        if ($allowedIds === []) {
+            return 'none';
+        }
+        $sorted = $allowedIds;
+        sort($sorted);
+
+        return implode(',', $sorted);
+    }
+
     // ─── Chart data ───────────────────────────────────────────────────────
 
     /**
      * Sales per day for the last 30 days.
      *
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{labels: list<string>, datasets: list<array<string, mixed>>}
      */
-    public function salesByDay(?int $locationId): array
+    public function salesByDay(?int $locationId, ?array $allowedIds = null): array
     {
-        $key = "dashboard:chart_sales_day:{$locationId}";
+        $key = "dashboard:chart_sales_day:{$locationId}:".$this->allowedKey($allowedIds);
 
-        return Cache::remember($key, self::TTL, function () use ($locationId): array {
+        return Cache::remember($key, self::TTL, function () use ($locationId, $allowedIds): array {
             $tz = config('app.timezone', 'UTC');
             $start = Carbon::now($tz)->subDays(29)->startOfDay();
             $end = Carbon::now($tz)->endOfDay();
@@ -426,6 +520,10 @@ class DashboardService
 
             if ($locationId !== null) {
                 $q->where('location_id', $locationId);
+            }
+
+            if ($allowedIds !== null) {
+                $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('location_id', $allowedIds);
             }
 
             $rows = $q->get()->keyBy('day');
@@ -449,13 +547,14 @@ class DashboardService
     /**
      * Sales by product category for the given period.
      *
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{labels: list<string>, datasets: list<array<string, mixed>>}
      */
-    public function salesByCategory(string $period, ?int $locationId): array
+    public function salesByCategory(string $period, ?int $locationId, ?array $allowedIds = null): array
     {
-        $key = "dashboard:chart_sales_cat:{$period}:{$locationId}";
+        $key = "dashboard:chart_sales_cat:{$period}:{$locationId}:".$this->allowedKey($allowedIds);
 
-        return Cache::remember($key, self::TTL, function () use ($period, $locationId): array {
+        return Cache::remember($key, self::TTL, function () use ($period, $locationId, $allowedIds): array {
             $bounds = $this->periodBounds($period);
 
             $q = DB::table('invoice_items')
@@ -474,6 +573,10 @@ class DashboardService
                 $q->where('invoices.location_id', $locationId);
             }
 
+            if ($allowedIds !== null) {
+                $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('invoices.location_id', $allowedIds);
+            }
+
             $rows = $q->get();
 
             return [
@@ -486,13 +589,14 @@ class DashboardService
     /**
      * Payments by method for the given period.
      *
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{labels: list<string>, datasets: list<array<string, mixed>>}
      */
-    public function paymentsByMethod(string $period, ?int $locationId): array
+    public function paymentsByMethod(string $period, ?int $locationId, ?array $allowedIds = null): array
     {
-        $key = "dashboard:chart_payments_method:{$period}:{$locationId}";
+        $key = "dashboard:chart_payments_method:{$period}:{$locationId}:".$this->allowedKey($allowedIds);
 
-        return Cache::remember($key, self::TTL, function () use ($period, $locationId): array {
+        return Cache::remember($key, self::TTL, function () use ($period, $locationId, $allowedIds): array {
             $bounds = $this->periodBounds($period);
 
             $q = DB::table('payments')
@@ -504,9 +608,11 @@ class DashboardService
                 ->orderByDesc('total');
 
             if ($locationId !== null) {
-                $q->join('pos_sessions', 'payments.pos_session_id', '=', 'pos_sessions.id')
-                    ->where('pos_sessions.location_id', $locationId)
-                    ->whereNotNull('payments.pos_session_id');
+                $q->where('payments.location_id', $locationId);
+            }
+
+            if ($allowedIds !== null) {
+                $allowedIds === [] ? $q->whereRaw('1 = 0') : $q->whereIn('payments.location_id', $allowedIds);
             }
 
             $rows = $q->get();

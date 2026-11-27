@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Dashboard;
 
-use App\Models\Location;
+use App\Services\Access\LocationAccess;
 use App\Services\Dashboard\DashboardService;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
@@ -53,11 +53,6 @@ class Index extends Component
             && ! $user->can('inventory.view');
     }
 
-    private function resolvedLocationId(): ?int
-    {
-        return $this->locationId !== '' ? (int) $this->locationId : null;
-    }
-
     // ─── Render ───────────────────────────────────────────────────────────
 
     public function render(): View
@@ -65,7 +60,21 @@ class Index extends Component
         abort_unless(auth()->user()?->can('dashboard.view'), 403);
 
         $svc = app(DashboardService::class);
-        $locId = $this->resolvedLocationId();
+        $access = app(LocationAccess::class);
+        $user = auth()->user();
+
+        $allowedIds = $access->allowedLocationIds($user);
+
+        // Guard URL-forged locationId: if user has no access to that location, ignore it.
+        $rawLocId = $this->locationId !== '' ? (int) $this->locationId : null;
+        $locId = null;
+        if ($rawLocId !== null) {
+            if ($allowedIds === null || in_array($rawLocId, $allowedIds, true)) {
+                $locId = $rawLocId;
+            }
+            // If user doesn't have access, $locId stays null and the allowedIds guard still applies.
+        }
+
         $userId = (int) auth()->id();
         $cashier = $this->isCashier();
         $period = in_array($this->period, ['today', '7d', 'month'], true) ? $this->period : 'today';
@@ -73,23 +82,23 @@ class Index extends Component
         $data = [];
 
         if ($this->canViewSales() || $cashier) {
-            $data['salesKpis'] = $svc->salesKpis($period, $locId, $cashier, $userId);
-            $data['receivablesKpis'] = $cashier ? null : $svc->receivablesKpis($locId);
-            $data['quotationKpis'] = $cashier ? null : $svc->quotationKpis($locId);
-            $data['recentInvoices'] = $svc->recentInvoices($locId, $cashier, $userId);
-            $data['topProducts'] = $cashier ? collect() : $svc->topProducts($period, $locId);
-            $data['overdueInvoices'] = $cashier ? collect() : $svc->overdueInvoices($locId);
-            $data['salesByDayChart'] = $cashier ? ['labels' => [], 'datasets' => []] : $svc->salesByDay($locId);
-            $data['salesByCatChart'] = $cashier ? ['labels' => [], 'datasets' => []] : $svc->salesByCategory($period, $locId);
-            $data['paymentsByMethod'] = $cashier ? ['labels' => [], 'datasets' => []] : $svc->paymentsByMethod($period, $locId);
+            $data['salesKpis'] = $svc->salesKpis($period, $locId, $cashier, $userId, $allowedIds);
+            $data['receivablesKpis'] = $cashier ? null : $svc->receivablesKpis($locId, $allowedIds);
+            $data['quotationKpis'] = $cashier ? null : $svc->quotationKpis($locId, $allowedIds);
+            $data['recentInvoices'] = $svc->recentInvoices($locId, $cashier, $userId, $allowedIds);
+            $data['topProducts'] = $cashier ? collect() : $svc->topProducts($period, $locId, $allowedIds);
+            $data['overdueInvoices'] = $cashier ? collect() : $svc->overdueInvoices($locId, $allowedIds);
+            $data['salesByDayChart'] = $cashier ? ['labels' => [], 'datasets' => []] : $svc->salesByDay($locId, $allowedIds);
+            $data['salesByCatChart'] = $cashier ? ['labels' => [], 'datasets' => []] : $svc->salesByCategory($period, $locId, $allowedIds);
+            $data['paymentsByMethod'] = $cashier ? ['labels' => [], 'datasets' => []] : $svc->paymentsByMethod($period, $locId, $allowedIds);
         }
 
         if ($this->canViewInventory()) {
-            $data['inventoryKpis'] = $svc->inventoryKpis();
-            $data['urgentItems'] = $svc->urgentInventoryItems();
+            $data['inventoryKpis'] = $svc->inventoryKpis($allowedIds);
+            $data['urgentItems'] = $svc->urgentInventoryItems($allowedIds);
         }
 
-        $data['locations'] = Location::query()->where('is_active', true)->orderBy('name')->get();
+        $data['locations'] = $access->allowedLocations($user);
         $data['period'] = $period;
         $data['isCashier'] = $cashier;
 

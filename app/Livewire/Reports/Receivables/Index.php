@@ -3,6 +3,7 @@
 namespace App\Livewire\Reports\Receivables;
 
 use App\Exports\Reports\ReceivablesAgingExport;
+use App\Services\Access\LocationAccess;
 use App\Services\Reports\ReceivablesAgingService;
 use Carbon\Carbon;
 use Illuminate\View\View;
@@ -27,8 +28,10 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.export'), 403);
 
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new ReceivablesAgingExport($this->asOf),
+            new ReceivablesAgingExport($this->asOf, $allowedIds),
             'receivables-aging.xlsx',
             Excel::XLSX
         );
@@ -38,8 +41,10 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.export'), 403);
 
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new ReceivablesAgingExport($this->asOf),
+            new ReceivablesAgingExport($this->asOf, $allowedIds),
             'receivables-aging.csv',
             Excel::CSV
         );
@@ -50,7 +55,8 @@ class Index extends Component
         abort_unless(auth()->user()?->can('reports.view'), 403);
 
         $asOf = Carbon::parse($this->asOf)->endOfDay();
-        $data = $service->get($asOf);
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+        $data = $service->get($asOf, $allowedIds);
 
         return view('livewire.reports.receivables.index', [
             'rows' => $data['rows'],

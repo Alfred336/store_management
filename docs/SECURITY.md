@@ -35,6 +35,34 @@ Authorization uses **Spatie Permission** (role/permission guards):
 
 Each Livewire action calls `$this->authorize(...)` or `Gate::authorize(...)` as the **first line** of every public method. All record IDs exposed in components are marked `#[Locked]` to prevent client-side tampering.
 
+### Location-Based Access Control
+
+A second authorization axis scopes data by **location** in addition to permissions:
+
+- **`LocationAccess` service** (`app/Services/Access/LocationAccess.php`): Returns `null` (Admin — unrestricted), `[]` (no access), or `int[]` (allowed location IDs). Results are cached per user; flushed when the user–location pivot changes.
+- **`ensure(User, locationId)`**: Throws `AuthorizationException` immediately if the user has no access to the specified location. Called inside every POS and payment Action that targets a specific location.
+- **`allowedLocationIds(User)`**: Returns the allowed set for use as a query guard (`whereIn / whereRaw('1=0')`).
+- **`allowedLocations(User)`**: Returns an Eloquent collection for populating dropdowns — users never see locations they cannot access.
+
+**Covered surfaces (groups 3B, 4, 5):**
+
+| Surface | Mechanism |
+|---|---|
+| `RecordPayment` / `ReversePayment` | `ensure()` on target location |
+| Payments list (Livewire) | `allowedLocationIds` → `whereIn` scope |
+| Customer statement | Payments scoped to allowed locations |
+| All POS Actions | `ensure()` before every mutation |
+| `ClosePosSession` | `ensure()` for `close_any_session`; own session always closable |
+| POS sessions list & PDF | `allowedIds` guard + 403 for forged location |
+| All 6 report services | `?array $allowedIds` parameter, `whereIn / 1=0` guard |
+| All 6 report exports | Same `allowedIds` passed from Livewire component |
+| All 6 Livewire report components | `allowedLocations()` dropdown + `allowedIds` to service/export |
+| `ReportPdfController` | `ensure()` for specific location + `allowedIds` to all services |
+| Dashboard KPIs, charts, lists | `allowedIds` guard on every query; cache key includes allowed-set hash |
+| Dashboard location dropdown | `allowedLocations()` — users cannot filter to forbidden locations |
+
+**URL forgery protection**: if a user manually sets `?locationId=X` for a location they cannot access, the `allowedIds` guard on the query returns no data (services) or the controller calls `ensure()` and returns 403 (PDF endpoint). The Dashboard silently ignores a forged location ID.
+
 ### Roles & Permissions Screen — Privilege Escalation Rules
 
 Three additional rules enforced by `SaveRolePermissions`:

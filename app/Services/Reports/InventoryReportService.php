@@ -8,8 +8,11 @@ use Illuminate\Support\Facades\DB;
 /** Inventory Report: current stock on hand grouped by product and location. */
 class InventoryReportService
 {
-    /** @return LengthAwarePaginator<int, \stdClass> */
-    public function paginate(?int $locationId = null, ?int $categoryId = null, int $perPage = 50): LengthAwarePaginator
+    /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
+     * @return LengthAwarePaginator<int, \stdClass>
+     */
+    public function paginate(?int $locationId = null, ?int $categoryId = null, int $perPage = 50, ?array $allowedIds = null): LengthAwarePaginator
     {
         return DB::table('stock_levels')
             ->join('products', 'products.id', '=', 'stock_levels.product_id')
@@ -31,15 +34,21 @@ class InventoryReportService
             ->whereNull('products.deleted_at')
             ->when($locationId !== null, fn ($q) => $q->where('stock_levels.location_id', $locationId))
             ->when($categoryId !== null, fn ($q) => $q->where('products.category_id', $categoryId))
+            ->when($allowedIds !== null, function ($q) use ($allowedIds): void {
+                empty($allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('stock_levels.location_id', $allowedIds);
+            })
             ->orderBy('products.name')
             ->orderBy('locations.name')
             ->paginate($perPage);
     }
 
     /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{total_value: string, total_lines: int}
      */
-    public function totals(?int $locationId = null, ?int $categoryId = null): array
+    public function totals(?int $locationId = null, ?int $categoryId = null, ?array $allowedIds = null): array
     {
         $row = DB::table('stock_levels')
             ->join('products', 'products.id', '=', 'stock_levels.product_id')
@@ -48,6 +57,11 @@ class InventoryReportService
             ->whereNull('products.deleted_at')
             ->when($locationId !== null, fn ($q) => $q->where('stock_levels.location_id', $locationId))
             ->when($categoryId !== null, fn ($q) => $q->where('products.category_id', $categoryId))
+            ->when($allowedIds !== null, function ($q) use ($allowedIds): void {
+                empty($allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('stock_levels.location_id', $allowedIds);
+            })
             ->first();
 
         return [

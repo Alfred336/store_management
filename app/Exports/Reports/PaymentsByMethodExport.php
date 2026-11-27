@@ -11,10 +11,12 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class PaymentsByMethodExport implements FromCollection, WithHeadings, WithMapping
 {
+    /** @param list<int>|null $allowedIds null = unrestricted; [] = no access */
     public function __construct(
         private readonly string $dateFrom,
         private readonly string $dateTo,
         private readonly ?int $locationId = null,
+        private readonly ?array $allowedIds = null,
     ) {}
 
     /** @return Collection<int, \stdClass> */
@@ -30,12 +32,12 @@ class PaymentsByMethodExport implements FromCollection, WithHeadings, WithMappin
             ->where('payments.status', 'active')
             ->where('payments.received_at', '>=', $start)
             ->where('payments.received_at', '<', $end)
-            ->when($this->locationId !== null, fn ($q) => $q->whereExists(function ($sub): void {
-                $sub->from('payment_allocations')
-                    ->join('invoices', 'invoices.id', '=', 'payment_allocations.invoice_id')
-                    ->whereColumn('payment_allocations.payment_id', 'payments.id')
-                    ->where('invoices.location_id', $this->locationId);
-            }))
+            ->when($this->locationId !== null, fn ($q) => $q->where('payments.location_id', $this->locationId))
+            ->when($this->allowedIds !== null, function ($q): void {
+                empty($this->allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('payments.location_id', $this->allowedIds);
+            })
             ->groupBy('payments.method')
             ->orderBy('payments.method')
             ->get();

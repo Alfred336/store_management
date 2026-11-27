@@ -14,7 +14,8 @@ class ReceivablesAgingExport implements FromCollection, WithHeadings, WithMappin
 {
     private readonly Carbon $asOf;
 
-    public function __construct(string $asOf)
+    /** @param list<int>|null $allowedIds null = unrestricted; [] = no access */
+    public function __construct(string $asOf, private readonly ?array $allowedIds = null)
     {
         $this->asOf = Carbon::parse($asOf)->endOfDay();
     }
@@ -53,6 +54,11 @@ class ReceivablesAgingExport implements FromCollection, WithHeadings, WithMappin
             ->selectRaw('SUM(invoices.total - invoices.amount_paid) AS total_outstanding')
             ->whereIn('invoices.status', $open)
             ->where('customers.is_active', true)
+            ->when($this->allowedIds !== null, function ($q): void {
+                empty($this->allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('invoices.location_id', $this->allowedIds);
+            })
             ->groupBy('customers.id', 'customers.name', 'customers.code')
             ->havingRaw('SUM(invoices.total - invoices.amount_paid) > 0')
             ->orderBy('customers.name')

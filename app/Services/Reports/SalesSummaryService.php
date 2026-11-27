@@ -14,9 +14,10 @@ use Illuminate\Support\Facades\DB;
 class SalesSummaryService
 {
     /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{rows: Collection<int, \stdClass>, totals: array{subtotal: string, discount_total: string, tax_total: string, total: string}, group_by: string}
      */
-    public function get(Carbon $from, Carbon $to, ?int $locationId = null): array
+    public function get(Carbon $from, Carbon $to, ?int $locationId = null, ?array $allowedIds = null): array
     {
         $days = $from->diffInDays($to);
         $groupBy = $days <= 31 ? 'day' : 'month';
@@ -44,6 +45,12 @@ class SalesSummaryService
             ->when($locationId !== null, fn ($q) => $q->where('location_id', $locationId))
             ->groupByRaw($dateTrunc)
             ->orderByRaw($dateTrunc);
+
+        if ($allowedIds !== null) {
+            empty($allowedIds)
+                ? $query->whereRaw('1 = 0')
+                : $query->whereIn('location_id', $allowedIds);
+        }
 
         $rows = $query->get();
 

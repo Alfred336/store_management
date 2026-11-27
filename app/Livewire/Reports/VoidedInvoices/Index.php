@@ -3,7 +3,7 @@
 namespace App\Livewire\Reports\VoidedInvoices;
 
 use App\Exports\Reports\VoidedInvoicesExport;
-use App\Models\Location;
+use App\Services\Access\LocationAccess;
 use App\Services\Reports\VoidedInvoicesService;
 use Carbon\Carbon;
 use Illuminate\View\View;
@@ -51,8 +51,10 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.export'), 403);
 
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new VoidedInvoicesExport($this->dateFrom, $this->dateTo, $this->locationFilter !== '' ? (int) $this->locationFilter : null),
+            new VoidedInvoicesExport($this->dateFrom, $this->dateTo, $this->locationFilter !== '' ? (int) $this->locationFilter : null, $allowedIds),
             'voided-invoices.xlsx',
             Excel::XLSX
         );
@@ -62,8 +64,10 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.export'), 403);
 
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new VoidedInvoicesExport($this->dateFrom, $this->dateTo, $this->locationFilter !== '' ? (int) $this->locationFilter : null),
+            new VoidedInvoicesExport($this->dateFrom, $this->dateTo, $this->locationFilter !== '' ? (int) $this->locationFilter : null, $allowedIds),
             'voided-invoices.csv',
             Excel::CSV
         );
@@ -76,10 +80,14 @@ class Index extends Component
         $from = Carbon::parse($this->dateFrom)->startOfDay();
         $to = Carbon::parse($this->dateTo)->endOfDay();
 
-        $locationId = $this->locationFilter !== '' ? (int) $this->locationFilter : null;
-        $invoices = $service->paginate($from, $to, $locationId);
+        $access = app(LocationAccess::class);
+        $user = auth()->user();
+        $allowedIds = $access->allowedLocationIds($user);
 
-        $locations = Location::query()->where('is_active', true)->orderBy('name')->get();
+        $locationId = $this->locationFilter !== '' ? (int) $this->locationFilter : null;
+        $invoices = $service->paginate($from, $to, $locationId, 50, $allowedIds);
+
+        $locations = $access->allowedLocations($user);
 
         return view('livewire.reports.voided-invoices.index', [
             'invoices' => $invoices,

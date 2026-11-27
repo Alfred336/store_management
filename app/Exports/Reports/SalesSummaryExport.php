@@ -12,10 +12,12 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class SalesSummaryExport implements FromCollection, WithHeadings, WithMapping
 {
+    /** @param list<int>|null $allowedIds null = unrestricted; [] = no access */
     public function __construct(
         private readonly string $dateFrom,
         private readonly string $dateTo,
         private readonly ?int $locationId = null,
+        private readonly ?array $allowedIds = null,
     ) {}
 
     /** @return Collection<int, \stdClass> */
@@ -38,6 +40,11 @@ class SalesSummaryExport implements FromCollection, WithHeadings, WithMapping
             ->whereNotNull('issue_date')
             ->whereBetween('issue_date', [$this->dateFrom, $this->dateTo])
             ->when($this->locationId !== null, fn ($q) => $q->where('location_id', $this->locationId))
+            ->when($this->allowedIds !== null, function ($q): void {
+                empty($this->allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('location_id', $this->allowedIds);
+            })
             ->groupByRaw("DATE_TRUNC('day', issue_date)")
             ->orderByRaw("DATE_TRUNC('day', issue_date)")
             ->get();

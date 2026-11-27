@@ -4,7 +4,7 @@ namespace App\Livewire\Reports\Inventory;
 
 use App\Exports\Reports\InventoryReportExport;
 use App\Models\Category;
-use App\Models\Location;
+use App\Services\Access\LocationAccess;
 use App\Services\Reports\InventoryReportService;
 use Illuminate\View\View;
 use Livewire\Attributes\Title;
@@ -41,8 +41,10 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.export'), 403);
 
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new InventoryReportExport($this->locationFilter !== '' ? (int) $this->locationFilter : null, $this->categoryFilter !== '' ? (int) $this->categoryFilter : null),
+            new InventoryReportExport($this->locationFilter !== '' ? (int) $this->locationFilter : null, $this->categoryFilter !== '' ? (int) $this->categoryFilter : null, $allowedIds),
             'inventory-report.xlsx',
             Excel::XLSX
         );
@@ -52,8 +54,10 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.export'), 403);
 
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new InventoryReportExport($this->locationFilter !== '' ? (int) $this->locationFilter : null, $this->categoryFilter !== '' ? (int) $this->categoryFilter : null),
+            new InventoryReportExport($this->locationFilter !== '' ? (int) $this->locationFilter : null, $this->categoryFilter !== '' ? (int) $this->categoryFilter : null, $allowedIds),
             'inventory-report.csv',
             Excel::CSV
         );
@@ -66,10 +70,14 @@ class Index extends Component
         $locationId = $this->locationFilter !== '' ? (int) $this->locationFilter : null;
         $categoryId = $this->categoryFilter !== '' ? (int) $this->categoryFilter : null;
 
-        $levels = $service->paginate($locationId, $categoryId);
-        $totals = $service->totals($locationId, $categoryId);
+        $access = app(LocationAccess::class);
+        $user = auth()->user();
+        $allowedIds = $access->allowedLocationIds($user);
 
-        $locations = Location::query()->where('is_active', true)->orderBy('name')->get();
+        $levels = $service->paginate($locationId, $categoryId, 50, $allowedIds);
+        $totals = $service->totals($locationId, $categoryId, $allowedIds);
+
+        $locations = $access->allowedLocations($user);
         $categories = Category::query()->orderBy('name')->get();
 
         return view('livewire.reports.inventory.index', [

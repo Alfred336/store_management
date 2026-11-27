@@ -3,7 +3,7 @@
 namespace App\Livewire\Reports\Payments;
 
 use App\Exports\Reports\PaymentsByMethodExport;
-use App\Models\Location;
+use App\Services\Access\LocationAccess;
 use App\Services\Reports\PaymentsByMethodService;
 use Carbon\Carbon;
 use Illuminate\View\View;
@@ -33,8 +33,10 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.export'), 403);
 
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new PaymentsByMethodExport($this->dateFrom, $this->dateTo, $this->locationFilter !== '' ? (int) $this->locationFilter : null),
+            new PaymentsByMethodExport($this->dateFrom, $this->dateTo, $this->locationFilter !== '' ? (int) $this->locationFilter : null, $allowedIds),
             'payments-by-method.xlsx',
             Excel::XLSX
         );
@@ -44,8 +46,10 @@ class Index extends Component
     {
         abort_unless(auth()->user()?->can('reports.export'), 403);
 
+        $allowedIds = app(LocationAccess::class)->allowedLocationIds(auth()->user());
+
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new PaymentsByMethodExport($this->dateFrom, $this->dateTo, $this->locationFilter !== '' ? (int) $this->locationFilter : null),
+            new PaymentsByMethodExport($this->dateFrom, $this->dateTo, $this->locationFilter !== '' ? (int) $this->locationFilter : null, $allowedIds),
             'payments-by-method.csv',
             Excel::CSV
         );
@@ -58,10 +62,14 @@ class Index extends Component
         $from = Carbon::parse($this->dateFrom)->startOfDay();
         $to = Carbon::parse($this->dateTo)->endOfDay();
 
-        $locationId = $this->locationFilter !== '' ? (int) $this->locationFilter : null;
-        $data = $service->get($from, $to, $locationId);
+        $access = app(LocationAccess::class);
+        $user = auth()->user();
+        $allowedIds = $access->allowedLocationIds($user);
 
-        $locations = Location::query()->where('is_active', true)->orderBy('name')->get();
+        $locationId = $this->locationFilter !== '' ? (int) $this->locationFilter : null;
+        $data = $service->get($from, $to, $locationId, $allowedIds);
+
+        $locations = $access->allowedLocations($user);
 
         return view('livewire.reports.payments.index', [
             'rows' => $data['rows'],

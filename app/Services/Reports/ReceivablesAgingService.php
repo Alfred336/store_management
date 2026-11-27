@@ -15,9 +15,10 @@ use Illuminate\Support\Facades\DB;
 class ReceivablesAgingService
 {
     /**
+     * @param  list<int>|null  $allowedIds  null = unrestricted; [] = no access
      * @return array{rows: Collection<int, \stdClass>, totals: array{current: string, days_31_60: string, days_61_90: string, days_90_plus: string, total: string}}
      */
-    public function get(Carbon $asOf): array
+    public function get(Carbon $asOf, ?array $allowedIds = null): array
     {
         $open = [
             InvoiceStatus::Issued->value,
@@ -48,6 +49,11 @@ class ReceivablesAgingService
             ->selectRaw('SUM(invoices.total - invoices.amount_paid) AS total_outstanding')
             ->whereIn('invoices.status', $open)
             ->where('customers.is_active', true)
+            ->when($allowedIds !== null, function ($q) use ($allowedIds): void {
+                empty($allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('invoices.location_id', $allowedIds);
+            })
             ->groupBy('customers.id', 'customers.name', 'customers.code')
             ->havingRaw('SUM(invoices.total - invoices.amount_paid) > 0')
             ->orderBy('customers.name')

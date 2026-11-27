@@ -12,10 +12,12 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class VatSummaryExport implements FromCollection, WithHeadings, WithMapping
 {
+    /** @param list<int>|null $allowedIds null = unrestricted; [] = no access */
     public function __construct(
         private readonly string $dateFrom,
         private readonly string $dateTo,
         private readonly ?int $locationId = null,
+        private readonly ?array $allowedIds = null,
     ) {}
 
     /** @return Collection<int, \stdClass> */
@@ -38,6 +40,11 @@ class VatSummaryExport implements FromCollection, WithHeadings, WithMapping
             ->whereNotNull('invoices.issue_date')
             ->whereBetween('invoices.issue_date', [$this->dateFrom, $this->dateTo])
             ->when($this->locationId !== null, fn ($q) => $q->where('invoices.location_id', $this->locationId))
+            ->when($this->allowedIds !== null, function ($q): void {
+                empty($this->allowedIds)
+                    ? $q->whereRaw('1 = 0')
+                    : $q->whereIn('invoices.location_id', $this->allowedIds);
+            })
             ->groupByRaw("DATE_TRUNC('day', invoices.issue_date)")
             ->orderByRaw("DATE_TRUNC('day', invoices.issue_date)")
             ->get();

@@ -63,18 +63,26 @@ class ReportPdfController extends Controller
             'location_id' => $locationId,
         ];
 
+        // Enforce location access: if a specific location was requested, the user must have access to it.
+        $access = app(LocationAccess::class);
+        $user = auth()->user();
+        if ($locationId !== null) {
+            $access->ensure($user, $locationId);
+        }
+        $allowedIds = $access->allowedLocationIds($user);
+
         $data = match ($report) {
             'sales' => array_merge(
-                $salesSummary->get($from, $to, $locationId),
+                $salesSummary->get($from, $to, $locationId, $allowedIds),
                 ['company' => $company, 'filters' => $filters, 'title' => 'Sales Summary']
             ),
             'vat' => array_merge(
-                $vatSummary->get($from, $to, $locationId),
+                $vatSummary->get($from, $to, $locationId, $allowedIds),
                 ['company' => $company, 'filters' => $filters, 'title' => 'VAT Summary']
             ),
-            'receivables' => (function () use ($request, $receivablesAging, $company): array {
+            'receivables' => (function () use ($request, $receivablesAging, $allowedIds, $company): array {
                 $asOf = Carbon::parse($request->input('asOf', now()->toDateString()))->endOfDay();
-                $result = $receivablesAging->get($asOf);
+                $result = $receivablesAging->get($asOf, $allowedIds);
 
                 return array_merge($result, [
                     'company' => $company,
@@ -83,39 +91,29 @@ class ReportPdfController extends Controller
                 ]);
             })(),
             'payments' => array_merge(
-                $paymentsByMethod->get($from, $to, $locationId),
+                $paymentsByMethod->get($from, $to, $locationId, $allowedIds),
                 ['company' => $company, 'filters' => $filters, 'title' => 'Payments by Method']
             ),
-            'pos-sessions' => (function () use ($posSessions, $from, $to, $locationId, $company, $filters): array {
-                $access = app(LocationAccess::class);
-                $user = auth()->user();
-                // If a specific location was requested, verify the user can access it.
-                if ($locationId !== null) {
-                    $access->ensure($user, $locationId);
-                }
-                $allowedIds = $access->allowedLocationIds($user);
-
-                return [
-                    'sessions' => $posSessions->paginate($from, $to, $locationId, 500, $allowedIds),
-                    'company' => $company,
-                    'filters' => $filters,
-                    'title' => 'POS Sessions',
-                ];
-            })(),
-            'inventory' => (function () use ($request, $inventoryReport, $company, $filters): array {
+            'pos-sessions' => [
+                'sessions' => $posSessions->paginate($from, $to, $locationId, 500, $allowedIds),
+                'company' => $company,
+                'filters' => $filters,
+                'title' => 'POS Sessions',
+            ],
+            'inventory' => (function () use ($request, $inventoryReport, $allowedIds, $company, $filters): array {
                 $categoryId = $request->filled('categoryId') ? (int) $request->input('categoryId') : null;
                 $locationId = $filters['location_id'];
 
                 return [
-                    'levels' => $inventoryReport->paginate($locationId, $categoryId, 500),
-                    'totals' => $inventoryReport->totals($locationId, $categoryId),
+                    'levels' => $inventoryReport->paginate($locationId, $categoryId, 500, $allowedIds),
+                    'totals' => $inventoryReport->totals($locationId, $categoryId, $allowedIds),
                     'company' => $company,
                     'filters' => $filters,
                     'title' => 'Inventory Report',
                 ];
             })(),
             'voided-invoices' => [
-                'invoices' => $voidedInvoices->paginate($from, $to, $locationId, 500),
+                'invoices' => $voidedInvoices->paginate($from, $to, $locationId, 500, $allowedIds),
                 'company' => $company,
                 'filters' => $filters,
                 'title' => 'Voided Invoices Audit',

@@ -190,6 +190,7 @@ test('EnsureSystemRoles grants reports.view to admin storekeeper and viewer but 
 test('sales summary shows correct totals for posted invoices', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $customer = reportCustomer();
 
     $today = now()->toDateString();
@@ -216,6 +217,7 @@ test('sales summary shows correct totals for posted invoices', function () {
 test('sales summary excludes invoices outside the date range', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $customer = reportCustomer();
 
     $yesterday = now()->subDay()->toDateString();
@@ -237,6 +239,7 @@ test('sales summary location filter only includes matching location', function (
     $admin = reportAdmin();
     $loc1 = reportLocation();
     $loc2 = reportLocation();
+    grantLocation($admin, $loc1, $loc2);
     $customer = reportCustomer();
     $today = now()->toDateString();
 
@@ -258,6 +261,7 @@ test('sales summary location filter only includes matching location', function (
 test('vat summary correctly separates standard and exempt tax amounts', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $customer = reportCustomer();
     $today = now()->toDateString();
 
@@ -344,6 +348,7 @@ test('vat summary correctly separates standard and exempt tax amounts', function
 test('receivables aging buckets by days overdue from as-of date', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $customer = reportCustomer();
 
     $asOf = now()->toDateString();
@@ -404,6 +409,7 @@ test('receivables aging buckets by days overdue from as-of date', function () {
 test('receivables aging excludes fully paid invoices', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $customer = reportCustomer();
 
     // Paid invoice — should not appear
@@ -430,6 +436,7 @@ test('receivables aging excludes fully paid invoices', function () {
 test('aging bucket boundary: invoice due exactly on as-of date is current', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $customer = reportCustomer();
     $today = now()->toDateString();
 
@@ -465,6 +472,7 @@ test('aging bucket boundary: invoice due exactly on as-of date is current', func
 test('voided invoices report shows only voided invoices within range', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $customer = reportCustomer();
     $today = now()->toDateString();
 
@@ -498,6 +506,7 @@ test('voided invoices report shows only voided invoices within range', function 
 test('voided invoices report excludes invoices voided outside date range', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $customer = reportCustomer();
 
     // Voided yesterday — outside today's range
@@ -530,6 +539,7 @@ test('voided invoices report excludes invoices voided outside date range', funct
 test('inventory report shows correct stock value', function () {
     $admin = reportAdmin();
     $location = reportLocation();
+    grantLocation($admin, $location);
     $unit = Unit::factory()->create();
 
     $product = Product::factory()->create([
@@ -713,6 +723,7 @@ test('payments at 00:30 and 23:30 EAT both appear for that local day; 02:00 next
             'received_at' => $receivedAt->toDateTimeString(),
             'received_by' => $user->id,
             'status' => 'active',
+            'location_id' => $location->id,
             'idempotency_key' => (string) Str::uuid(),
         ]);
         PaymentAllocation::forceCreate(['payment_id' => $pay->id, 'invoice_id' => $inv->id, 'amount' => $amount]);
@@ -910,6 +921,7 @@ it('payment received_at: local-day boundary at every EAT boundary time', functio
         'received_at' => Carbon::parse($localTimestamp, $tz)->toDateTimeString(),
         'received_by' => $user->id,
         'status' => 'active',
+        'location_id' => $location->id,
         'idempotency_key' => (string) Str::uuid(),
     ]);
     PaymentAllocation::forceCreate(['payment_id' => $pay->id, 'invoice_id' => $inv->id, 'amount' => '50.00']);

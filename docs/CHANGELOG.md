@@ -1,5 +1,23 @@
 # Changelog
 
+## [Phase 3B + 4 + 5: Location Access — Payments, POS, Reports & Dashboard] - 2026-11-26
+
+### Added
+
+- **`payments.location_id` column** (`2026_11_26_000001_add_location_id_to_payments_table.php`): Stores the location against which a payment was recorded; backfilled from the allocated invoice's `location_id`. Used by all payment-related reports, exports, and dashboard KPIs.
+- **`LocationAccess` service** (`app/Services/Access/LocationAccess.php`): Central service returning `null` (Admin/all), `[]` (no access), or `int[]` (allowed IDs). `ensure()` throws `AuthorizationException` for forbidden locations. `allowedLocations()` returns an Eloquent collection. Results cached per user, flushed on location-pivot change.
+- **`grantLocation(User, Location...)` test helper** (`tests/Pest.php`): Attaches locations via `syncWithoutDetaching` and flushes the cache.
+- **Location access — Payments** (`PaymentsAccessTest.php`): `RecordPayment` stores `location_id`; `ReversePayment` enforces location access; list scoped to allowed locations; customer statement payments scoped. 25 access tests.
+- **Location access — POS** (`PosAccessTest.php`): `OpenPosSession`, `CompletePosSale`, `HoldSale`, `ResumeSale`, `ClosePosSession` all call `ensure()` for the target location. `close_any_session` limited to allowed locations; user may always close own session even after losing access. POS sessions list and PDF scoped. 15 access tests.
+- **Location access — Reports** (`ReportsAccessTest.php`): All 6 report services (`SalesSummaryService`, `VatSummaryService`, `ReceivablesAgingService`, `PaymentsByMethodService`, `InventoryReportService`, `VoidedInvoicesService`) accept `?array $allowedIds`. All 6 exports pass `allowedIds`. All 6 Livewire report components use `allowedLocations()` for dropdown and pass `allowedIds` to service and export. `ReportPdfController` enforces location access and passes `allowedIds` to every report type. 11 access tests.
+- **Location access — Dashboard** (`DashboardService`): All KPI, chart, and list methods accept `?array $allowedIds`. Cache keys include `allowedKey()` suffix ensuring per-user isolation. Payment queries use `payments.location_id` instead of `pos_sessions` join. `Dashboard/Index.php` guards URL-forged `locationId`, passes `allowedIds` to every method, and uses `allowedLocations()` for the dropdown.
+
+### Changed
+
+- `PaymentsByMethodService` and `PaymentsByMethodExport`: switched location filter from `whereExists(pos_sessions join)` to `payments.location_id` for correctness.
+- `DashboardService::paymentsByMethod` and `salesKpis` payment queries: switched to `payments.location_id`.
+- All Livewire report components: replaced `Location::query()->where(...)` dropdown with `LocationAccess::allowedLocations()`.
+
 ## [Phase 3A: Passwords, Template Settings & Always-Thermal Receipts] - 2026-11-15
 
 ### Added
